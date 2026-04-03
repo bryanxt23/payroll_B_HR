@@ -1,0 +1,13 @@
+.progressRow{
+  margin-top: 10px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.08);
+  overflow:hidden;
+}
+
+.progressFill{
+  height:100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--yellow), rgba(0,0,0,.85));
+}

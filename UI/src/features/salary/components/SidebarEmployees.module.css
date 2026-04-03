@@ -1,0 +1,98 @@
+.left{
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
+  min-width: 260px;
+}
+
+.sectionTitle{
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing:.2px;
+  margin: 10px 4px 10px;
+  opacity:.92;
+}
+
+.leftCard{
+  background: rgba(255,255,255,.55);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 28px;
+  box-shadow: 0 10px 22px rgba(0,0,0,.06);
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  overflow:hidden;
+}
+
+.emp{
+  display:flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 22px;
+  background: rgba(255,255,255,.5);
+  border: 1px solid rgba(0,0,0,.05);
+}
+
+.empInfo{ flex:1; }
+.empName{ font-size: 13.5px; font-weight: 650; }
+.empRole{ font-size: 11.5px; color: rgba(0,0,0,.55); margin-top:2px; }
+
+.pager{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-top:auto;
+  padding: 4px 8px 2px;
+  color: rgba(0,0,0,.55);
+}
+
+.pagerNums{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size: 12px;
+}
+
+.pagerNum{
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.55);
+  border:1px solid rgba(0,0,0,.06);
+  display:grid; place-items:center;
+}
+
+.pagerNumActive{
+  background: #1b1b1b;
+  color:#fff;
+}
+
+.arrow{
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.55);
+  border:1px solid rgba(0,0,0,.06);
+  display:grid;place-items:center;
+  cursor:pointer;
+}
+
+@media (max-width: 860px){
+  .left{ display:none; }
+}
+
+.emp {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.emp:hover {
+  background: rgba(0,0,0,.03);
+}
+
+.empActive {
+  background: rgba(0,0,0,.05);
+  border-radius: 16px;
+}
+
+.emp { user-select: none; }
+.emp:focus { outline: 2px solid rgba(0,0,0,.12); }

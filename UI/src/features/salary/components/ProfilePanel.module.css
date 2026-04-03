@@ -1,0 +1,146 @@
+.right{
+  background: rgba(255,255,255,.55);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 28px;
+  box-shadow: 0 10px 22px rgba(0,0,0,.06);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.hero{
+  height: 140px;
+  background:
+    radial-gradient(120px 80px at 25% 50%, rgba(255,255,255,.28), transparent 60%),
+    radial-gradient(240px 140px at 65% 50%, rgba(246,200,71,.55), transparent 65%),
+    linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.60));
+  position:relative;
+}
+
+.heroAvatar{
+  position:absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -26px;
+  width: 74px; height: 74px;
+  border-radius: 999px;
+  border: 4px solid rgba(255,255,255,.75);
+  background: linear-gradient(135deg, rgba(255,255,255,.45), rgba(255,255,255,.08));
+  box-shadow: 0 14px 22px rgba(0,0,0,.18);
+  display:grid;place-items:center;
+  font-weight:800;
+  color: rgba(255,255,255,.85);
+}
+
+.profile{
+  padding: 42px 18px 18px;
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+  overflow:auto;
+}
+
+.pName{ text-align:center; font-weight: 750; font-size: 18px; }
+.pRole{ text-align:center; margin-top:-8px; color: rgba(0,0,0,.5); font-size: 12px; }
+
+.blockTitle{
+  font-size: 12px;
+  color: rgba(0,0,0,.55);
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.infoList{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.infoRow{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  font-size: 12px;
+  color: rgba(0,0,0,.70);
+}
+
+.k{
+  flex: 0 0 110px;
+  color: rgba(0,0,0,.45);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.v{
+  flex:1;
+  border-bottom: 1px dotted rgba(0,0,0,.15);
+  padding-bottom: 2px;
+  text-align:right;
+  color: rgba(0,0,0,.70);
+}
+
+.docRow{ display:flex; gap: 10px; }
+
+.doc{
+  flex:1;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,.06);
+  background: rgba(255,255,255,.55);
+  padding: 10px;
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+
+.docIcon{
+  width: 34px; height: 34px;
+  border-radius: 12px;
+  display:grid; place-items:center;
+  color:#fff;
+  font-weight:900;
+}
+
+.word{ background: #2b6cb0; }
+.ppt{ background: #d35400; }
+
+.docName{ font-size: 12px; font-weight: 700; }
+.docSize{ font-size: 10px; color: rgba(0,0,0,.45); margin-top:2px; }
+
+.stat{
+  margin-top: 2px;
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+
+.statRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size: 12px;
+  color: rgba(0,0,0,.60);
+}
+
+.miniBar{
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.10);
+  border: 1px solid rgba(0,0,0,.05);
+  overflow:hidden;
+}
+
+.miniFill{
+  height:100%;
+  border-radius: 999px;
+  background: var(--yellow);
+}
+
+.miniFillDark{
+  background: rgba(0,0,0,.80);
+}
+
+@media (max-width: 1100px){
+  .right{ display:none; }
+}

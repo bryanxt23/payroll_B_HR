@@ -1,0 +1,128 @@
+.center{
+  background: rgba(255,255,255,.50);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 28px;
+  box-shadow: 0 10px 22px rgba(0,0,0,.06);
+  padding: 16px 18px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.centerTop{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+}
+
+.searchWrap{
+  flex: 1;
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  background: rgba(255,255,255,.62);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 999px;
+  padding: 10px 12px;
+}
+
+.searchInput{
+  border:0;
+  outline:none;
+  background:transparent;
+  flex:1;
+  font-size: 12.5px;
+  color: rgba(0,0,0,.7);
+}
+
+.centerStats{
+  margin-top: 14px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap: 14px;
+}
+
+.hoursBig{
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing:.2px;
+}
+
+.hoursBig span{
+  font-weight: 500;
+  color: rgba(0,0,0,.55);
+}
+
+.monthPill{
+  margin-left:auto;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.06);
+  background: rgba(255,255,255,.62);
+  font-size: 12px;
+  color: rgba(0,0,0,.65);
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.bars{
+  display:grid;
+  grid-template-columns: 1.2fr .9fr .9fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.barCard{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.barLabel{
+  font-size: 12px;
+  color: rgba(0,0,0,.55);
+}
+
+.barPill{
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.10);
+  overflow:hidden;
+  border: 1px solid rgba(0,0,0,.05);
+  position:relative;
+}
+
+.yellowPill{ background: rgba(246,200,71,.35); }
+.darkPill{ background: rgba(0,0,0,.82); }
+
+.barFill{
+  height:100%;
+  border-radius: 999px;
+  width: 42%;
+  background: rgba(0,0,0,.20);
+}
+
+.fillYellow{ background: var(--yellow); width: 72%; }
+.fillDark{ background: rgba(255,255,255,.18); width: 42%; }
+.fillGrey{ background: rgba(0,0,0,.22); width: 58%; }
+
+.barText{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  padding-left: 14px;
+  font-size: 12px;
+  color: rgba(0,0,0,.7);
+}
+
+.barTextWhite{ color:#fff; }
+
+.searchWrap svg{
+  width:16px;
+  height:16px;
+  opacity:.6;
+}
