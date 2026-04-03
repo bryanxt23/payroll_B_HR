@@ -129,12 +129,15 @@ export default function SalaryPage() {
         setProfile({
           ...emp,
           info: [
-            { k: "Birthday", v: p.birthday, icon: "cal" },
-            { k: "Phone number", v: p.phone, icon: "phone" },
-            { k: "Email", v: p.email, icon: "mail" },
-            { k: "Citizenship", v: p.citizenship, icon: "id" }, // ✅ fixed
-            { k: "City", v: p.city, icon: "pin" },
-            { k: "Address", v: p.address, icon: "pin" },
+            { k: "Birthday",    v: p.birthday,    icon: "cal"   },
+            { k: "Phone number",v: p.phone,        icon: "phone" },
+            { k: "Email",       v: p.email,        icon: "mail"  },
+            { k: "Citizenship", v: p.citizenship,  icon: "id"    },
+            { k: "City",        v: p.city,         icon: "pin"   },
+            { k: "Address",     v: p.address,      icon: "pin"   },
+            { k: "Department",  v: emp.department, icon: "id"    },
+            { k: "Status",      v: emp.status,     icon: "id"    },
+            { k: "Salary",      v: emp.salary != null ? `$${Number(emp.salary).toLocaleString()}` : null, icon: "cal" },
           ].filter((x) => x.v),  // .filter(...) <-- this removes/filter out any row item if the v: is empty like v: "" or v: null or v: undefined. So only info items with a value will be shown.
 
           // They ensure docs and stats are always arrays.
@@ -175,18 +178,19 @@ export default function SalaryPage() {
     <MainGrid>
       <SidebarEmployees
         employees={employees}
-        selectedId={selectedCode}
+        selectedCode={selectedCode}
         onSelect={setSelectedCode}
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
       />
-      <SalaryCenter 
+      <SalaryCenter
         calendarDays={calendarDays}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
         onMonthChange={setSelectedMonth}
         onYearChange={setSelectedYear}
+        selectedEmployee={profile}
       />
 
       <ProfilePanel profile={profile} />

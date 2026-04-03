@@ -44,7 +44,21 @@ public class EmployeeController {
     public EmployeeProfile getProfile(@PathVariable String code) {
         Employee emp = getByCode(code);
         return profileRepo.findByEmployeeId(emp.getId())
-                .orElseThrow(() -> new RuntimeException("Profile not found for: " + code));
+                .orElseGet(() -> { EmployeeProfile p = new EmployeeProfile(); p.setEmployeeId(emp.getId()); return p; });
+    }
+
+    @PutMapping("/{code}/profile")
+    public EmployeeProfile updateProfile(@PathVariable String code, @RequestBody EmployeeProfile body) {
+        Employee emp = getByCode(code);
+        EmployeeProfile profile = profileRepo.findByEmployeeId(emp.getId())
+                .orElseGet(() -> { EmployeeProfile p = new EmployeeProfile(); p.setEmployeeId(emp.getId()); return p; });
+        if (body.getBirthday()    != null) profile.setBirthday(body.getBirthday());
+        if (body.getPhone()       != null) profile.setPhone(body.getPhone());
+        if (body.getEmail()       != null) profile.setEmail(body.getEmail());
+        if (body.getCitizenship() != null) profile.setCitizenship(body.getCitizenship());
+        if (body.getCity()        != null) profile.setCity(body.getCity());
+        if (body.getAddress()     != null) profile.setAddress(body.getAddress());
+        return profileRepo.save(profile);
     }
 
     @GetMapping("/{code}/documents")

@@ -10,7 +10,12 @@ export default function SalaryCenter({
   selectedYear,
   onMonthChange,
   onYearChange,
+  selectedEmployee,
 }) {
+  const salary = selectedEmployee?.salary != null
+    ? `$${Number(selectedEmployee.salary).toLocaleString()}`
+    : "—";
+
   return (
     <div className={styles.center}>
       <div className={styles.centerTop}>
@@ -26,11 +31,8 @@ export default function SalaryCenter({
       </div>
 
       <div className={styles.centerStats}>
-        {/* <div className={styles.hoursBig}>
-          264.00 <span>hrs</span> / $2,647
-        </div> */}
         <div className={styles.hoursBig}>
-          <span>Monthly Salary</span> $2,647
+          <span>Monthly Salary</span> {salary}
         </div>
         <select
           className={styles.monthPill}
