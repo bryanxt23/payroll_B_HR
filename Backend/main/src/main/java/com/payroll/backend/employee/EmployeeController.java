@@ -84,4 +84,24 @@ public class EmployeeController {
     public Employee create(@RequestBody Employee employee) {
         return repo.save(employee);
     }
+
+    @PutMapping("/{code}")
+    public Employee update(@PathVariable String code, @RequestBody Employee body) {
+        Employee emp = repo.findByCode(code)
+                .orElseThrow(() -> new RuntimeException("Employee not found: " + code));
+        if (body.getName()       != null) emp.setName(body.getName());
+        if (body.getRole()       != null) emp.setRole(body.getRole());
+        if (body.getDepartment() != null) emp.setDepartment(body.getDepartment());
+        if (body.getSalary()     != null) emp.setSalary(body.getSalary());
+        if (body.getStatus()     != null) emp.setStatus(body.getStatus());
+        if (body.getPct()        != null) emp.setPct(body.getPct());
+        return repo.save(emp);
+    }
+
+    @DeleteMapping("/{code}")
+    public void delete(@PathVariable String code) {
+        Employee emp = repo.findByCode(code)
+                .orElseThrow(() -> new RuntimeException("Employee not found: " + code));
+        repo.delete(emp);
+    }
 }
