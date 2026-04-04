@@ -1,9 +1,9 @@
 package com.payroll.backend.employee;
 
+import com.payroll.backend.inventory.CloudinaryService;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -15,17 +15,20 @@ public class EmployeeController {
     private final EmployeeDocumentRepository documentRepo;
     private final EmployeeStatRepository statRepo;
     private final EmployeeCalendarRepository calendarRepo;
+    private final CloudinaryService cloudinary;
 
     public EmployeeController(EmployeeRepository repo,
                               EmployeeProfileRepository profileRepo,
                               EmployeeDocumentRepository docRepo,
                               EmployeeStatRepository statRepo,
-                              EmployeeCalendarRepository calendarRepo) {
+                              EmployeeCalendarRepository calendarRepo,
+                              CloudinaryService cloudinary) {
         this.repo = repo;
         this.profileRepo = profileRepo;
         this.documentRepo = docRepo;
         this.statRepo = statRepo;
         this.calendarRepo = calendarRepo;
+        this.cloudinary = cloudinary;
     }
 
     @GetMapping
@@ -117,5 +120,44 @@ public class EmployeeController {
         Employee emp = repo.findByCode(code)
                 .orElseThrow(() -> new RuntimeException("Employee not found: " + code));
         repo.delete(emp);
+    }
+
+    @PostMapping(value = "/{code}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Employee uploadPhoto(@PathVariable String code,
+                                @RequestParam("file") MultipartFile file) throws java.io.IOException {
+        Employee emp = getByCode(code);
+        String url = cloudinary.uploadWithPublicId(file, "payroll_B_HR_1/" + code + "/Profile", "photo");
+        emp.setPhotoUrl(url);
+        return repo.save(emp);
+    }
+
+    @PostMapping(value = "/{code}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public EmployeeDocument uploadDocument(@PathVariable String code,
+                                           @RequestParam("file") MultipartFile file,
+                                           @RequestParam("name") String name,
+                                           @RequestParam("type") String type,
+                                           @RequestParam("tag") String tag) throws java.io.IOException {
+        Employee emp = getByCode(code);
+        String safeName = name.toLowerCase().replaceAll("\\s+", "_");
+        String url = cloudinary.uploadWithPublicId(file, "payroll_B_HR_1/" + code + "/Documents", safeName);
+        long bytes = file.getSize();
+        String size = bytes >= 1_048_576
+                ? String.format("%.0f mb", bytes / 1_048_576.0)
+                : String.format("%.0f kb", bytes / 1_024.0);
+        // Upsert: update existing document row with same name, or insert new
+        EmployeeDocument doc = documentRepo.findByEmployeeIdOrderByIdAsc(emp.getId())
+                .stream().filter(d -> name.equalsIgnoreCase(d.getName())).findFirst()
+                .orElseGet(() -> { EmployeeDocument d = new EmployeeDocument(); d.setEmployeeId(emp.getId()); return d; });
+        doc.setName(name);
+        doc.setType(type);
+        doc.setTag(tag);
+        doc.setSize(size);
+        doc.setUrl(url);
+        return documentRepo.save(doc);
+    }
+
+    @DeleteMapping("/{code}/documents/{docId}")
+    public void deleteDocument(@PathVariable String code, @PathVariable Long docId) {
+        documentRepo.deleteById(docId);
     }
 }

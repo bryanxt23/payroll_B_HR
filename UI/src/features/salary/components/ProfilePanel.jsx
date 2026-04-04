@@ -32,7 +32,10 @@ export default function ProfilePanel({ profile }) {
   return (
     <div className={styles.right}>
       <div className={styles.hero}>
-        <div className={styles.heroAvatar}>{initials(profile.name)}</div>
+        {profile.photoUrl
+          ? <img src={profile.photoUrl} alt={profile.name} className={styles.heroAvatarImg} />
+          : <div className={styles.heroAvatar}>{initials(profile.name)}</div>
+        }
       </div>
 
       <div className={styles.profile}>

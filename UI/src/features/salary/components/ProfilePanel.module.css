@@ -17,7 +17,7 @@
   position:relative;
 }
 
-.heroAvatar{
+.heroAvatar, .heroAvatarImg {
   position:absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -25,11 +25,18 @@
   width: 74px; height: 74px;
   border-radius: 999px;
   border: 4px solid rgba(255,255,255,.75);
-  background: linear-gradient(135deg, rgba(255,255,255,.45), rgba(255,255,255,.08));
   box-shadow: 0 14px 22px rgba(0,0,0,.18);
+}
+
+.heroAvatar {
+  background: linear-gradient(135deg, rgba(255,255,255,.45), rgba(255,255,255,.08));
   display:grid;place-items:center;
   font-weight:800;
   color: rgba(255,255,255,.85);
+}
+
+.heroAvatarImg {
+  object-fit: cover;
 }
 
 .profile{

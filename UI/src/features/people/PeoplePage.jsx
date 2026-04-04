@@ -31,16 +31,26 @@ const EMPTY_FORM = {
   birthday: "", phone: "", email: "", citizenship: "", city: "", address: "",
 };
 
-function EmployeeModal({ emp, onClose, onSaved }) {
-  const [form, setForm]       = useState(EMPTY_FORM);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState("");
-  const isEdit                = !!emp;
-  const overlayRef            = useRef(null);
+const DOC_TYPES = [
+  { key: "contract", label: "Contract", tag: "P", type: "pdf", color: "#2b6cb0" },
+  { key: "resume",   label: "Resume",   tag: "P", type: "pdf",  color: "#c0392b" },
+  { key: "cv",       label: "CV",       tag: "P", type: "pdf",  color: "#6c3483" },
+];
 
-  // Load existing data when editing
+function EmployeeModal({ emp, onClose, onSaved }) {
+  const [form, setForm]         = useState(EMPTY_FORM);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState("");
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoFile, setPhotoFile]       = useState(null);
+  const [docFiles, setDocFiles]         = useState({}); // { contract: File, resume: File, cv: File }
+  const [existingDocs, setExistingDocs] = useState([]);
+  const isEdit     = !!emp;
+  const overlayRef = useRef(null);
+  const photoRef   = useRef(null);
+
   useEffect(() => {
-    if (!emp) { setForm(EMPTY_FORM); return; }
+    if (!emp) { setForm(EMPTY_FORM); setPhotoPreview(null); setPhotoFile(null); setDocFiles({}); setExistingDocs([]); return; }
     const base = {
       name:        emp.name        || "",
       role:        emp.role        || "",
@@ -50,10 +60,16 @@ function EmployeeModal({ emp, onClose, onSaved }) {
       birthday: "", phone: "", email: "", citizenship: "", city: "", address: "",
     };
     setForm(base);
-    // Fetch profile
-    fetch(`${API_BASE}/api/employees/${emp.code}/profile`)
-      .then(r => r.ok ? r.json() : {})
-      .then(p => setForm(f => ({
+    setPhotoPreview(emp.photoUrl || null);
+    setPhotoFile(null);
+    setDocFiles({});
+
+    // Fetch profile + documents
+    Promise.all([
+      fetch(`${API_BASE}/api/employees/${emp.code}/profile`).then(r => r.ok ? r.json() : {}),
+      fetch(`${API_BASE}/api/employees/${emp.code}/documents`).then(r => r.ok ? r.json() : []),
+    ]).then(([p, docs]) => {
+      setForm(f => ({
         ...f,
         birthday:    p.birthday    || "",
         phone:       p.phone       || "",
@@ -61,11 +77,27 @@ function EmployeeModal({ emp, onClose, onSaved }) {
         citizenship: p.citizenship || "",
         city:        p.city        || "",
         address:     p.address     || "",
-      })))
-      .catch(() => {});
+      }));
+      setExistingDocs(Array.isArray(docs) ? docs : []);
+    }).catch(() => {});
   }, [emp]);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  function onPhotoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  function onDocChange(key, e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDocFiles(d => ({ ...d, [key]: file }));
+  }
+
+  function removeDoc(key) { setDocFiles(d => { const n = { ...d }; delete n[key]; return n; }); }
 
   async function save() {
     if (!form.name.trim()) { setError("Name is required."); return; }
@@ -109,6 +141,25 @@ function EmployeeModal({ emp, onClose, onSaved }) {
         body: JSON.stringify(profileBody),
       });
 
+      // Upload photo if changed
+      if (photoFile) {
+        const fd = new FormData();
+        fd.append("file", photoFile);
+        await fetch(`${API_BASE}/api/employees/${code}/photo`, { method: "POST", body: fd });
+      }
+
+      // Upload new documents
+      for (const dt of DOC_TYPES) {
+        const file = docFiles[dt.key];
+        if (!file) continue;
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("name", dt.label);
+        fd.append("type", dt.type);
+        fd.append("tag",  dt.tag);
+        await fetch(`${API_BASE}/api/employees/${code}/documents`, { method: "POST", body: fd });
+      }
+
       onSaved();
     } catch (e) {
       setError("Failed to save. Please try again.");
@@ -123,8 +174,14 @@ function EmployeeModal({ emp, onClose, onSaved }) {
 
         {/* Modal header */}
         <div className={styles.modalHeader}>
-          <div className={styles.modalAvatar} style={{ background: avatarColor(form.name || "?") }}>
-            {initials(form.name || "?")}
+          {/* Photo upload */}
+          <div className={styles.photoWrap} onClick={() => photoRef.current?.click()} title="Click to change photo">
+            {photoPreview
+              ? <img src={photoPreview} alt="photo" className={styles.photoImg} />
+              : <div className={styles.modalAvatar} style={{ background: avatarColor(form.name || "?") }}>{initials(form.name || "?")}</div>
+            }
+            <div className={styles.photoOverlay}>📷</div>
+            <input ref={photoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPhotoChange} />
           </div>
           <div>
             <div className={styles.modalTitle}>{isEdit ? form.name || "Edit Employee" : "Add Employee"}</div>
@@ -168,7 +225,7 @@ function EmployeeModal({ emp, onClose, onSaved }) {
           <div className={styles.modalGrid}>
             <div className={styles.field}>
               <label className={styles.label}>Birthday</label>
-              <input className={styles.input} value={form.birthday} onChange={e => set("birthday", e.target.value)} placeholder="e.g. 1991-12-11" />
+              <input className={styles.input} type="date" value={form.birthday} onChange={e => set("birthday", e.target.value)} />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Phone Number</label>
@@ -190,6 +247,33 @@ function EmployeeModal({ emp, onClose, onSaved }) {
               <label className={styles.label}>Address</label>
               <input className={styles.input} value={form.address} onChange={e => set("address", e.target.value)} placeholder="e.g. Tanjong Pagar" />
             </div>
+          </div>
+
+          {/* Documents */}
+          <div className={styles.modalSection}>Documents</div>
+          <div className={styles.docsGrid}>
+            {DOC_TYPES.map(dt => {
+              const existing = existingDocs.find(d => d.name === dt.label);
+              const staged   = docFiles[dt.key];
+              return (
+                <div key={dt.key} className={styles.docCard}>
+                  <div className={styles.docCardIcon} style={{ background: dt.color }}>{dt.tag}</div>
+                  <div className={styles.docCardInfo}>
+                    <div className={styles.docCardLabel}>{dt.label}</div>
+                    {staged
+                      ? <div className={styles.docCardFile}>{staged.name} <button className={styles.docRemove} onClick={() => removeDoc(dt.key)}>✕</button></div>
+                      : existing
+                        ? <a className={styles.docCardFile} href={existing.url} target="_blank" rel="noreferrer">{existing.size} — view</a>
+                        : <div className={styles.docCardEmpty}>No file</div>
+                    }
+                  </div>
+                  <label className={styles.docUploadBtn} title={`Upload ${dt.label}`}>
+                    ↑
+                    <input type="file" style={{ display: "none" }} onChange={e => onDocChange(dt.key, e)} />
+                  </label>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -345,6 +429,12 @@ export default function PeoplePage() {
                   <td className={styles.tdEdit}>
                     <button className={styles.editBtn} title="Edit" onClick={() => setModalEmp(emp)}>✎</button>
                   </td>
+                </tr>
+              ))}
+              {/* Ghost rows to keep table height fixed at PAGE_SIZE rows */}
+              {Array.from({ length: PAGE_SIZE - pageRows.length }).map((_, i) => (
+                <tr key={`ghost-${i}`} className={styles.trGhost}>
+                  <td colSpan={7} />
                 </tr>
               ))}
             </tbody>

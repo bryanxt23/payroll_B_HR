@@ -28,6 +28,8 @@ public class Employee {
     // e.g. "Active", "Leave", "Inactive"
     private String status;
 
+    private String photoUrl;
+
     // --- constructors ---
     public Employee() {}
 
@@ -48,6 +50,7 @@ public class Employee {
     public String getDepartment() { return department; }
     public java.math.BigDecimal getSalary() { return salary; }
     public String getStatus() { return status; }
+    public String getPhotoUrl() { return photoUrl; }
 
     public void setCode(String code) { this.code = code; }
     public void setName(String name) { this.name = name; }
@@ -56,4 +59,5 @@ public class Employee {
     public void setDepartment(String department) { this.department = department; }
     public void setSalary(java.math.BigDecimal salary) { this.salary = salary; }
     public void setStatus(String status) { this.status = status; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
 }

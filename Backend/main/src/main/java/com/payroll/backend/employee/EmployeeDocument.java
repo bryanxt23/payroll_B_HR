@@ -13,11 +13,12 @@ public class EmployeeDocument {
     @Column(name = "employee_id", nullable = false)
     private Long employeeId;
 
-    // DB columns: name, size, type, tag
+    // DB columns: name, size, type, tag, url
     private String name;
     private String size;
     private String type;
     private String tag;
+    private String url;
 
     // ----- getters/setters -----
     public Long getId() { return id; }
@@ -36,4 +37,7 @@ public class EmployeeDocument {
 
     public String getTag() { return tag; }
     public void setTag(String tag) { this.tag = tag; }
+
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
 }

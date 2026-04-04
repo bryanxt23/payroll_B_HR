@@ -194,9 +194,17 @@
 .tr {
   border-bottom: 1px solid rgba(0,0,0,.04);
   transition: background .15s;
+  height: 64px;
 }
 .tr:last-child { border-bottom: none; }
 .tr:hover { background: rgba(255,255,255,.55); }
+
+/* ghost rows that fill empty slots */
+.trGhost {
+  height: 64px;
+  border-bottom: 1px solid rgba(0,0,0,.04);
+}
+.trGhost:last-child { border-bottom: none; }
 
 .td {
   padding: 13px 12px;
@@ -484,3 +492,78 @@
 }
 .saveBtn:hover:not(:disabled) { background: #333; }
 .saveBtn:disabled, .cancelBtn:disabled { opacity: .5; cursor: default; }
+
+/* ── Photo upload ── */
+.photoWrap {
+  position: relative;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.photoImg {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.photoOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,.45);
+  display: grid; place-items: center;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.photoWrap:hover .photoOverlay { opacity: 1; }
+
+/* ── Documents section ── */
+.docsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255,255,255,.70);
+  border: 1.5px solid rgba(0,0,0,.07);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.docCardIcon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.docCardInfo { flex: 1; min-width: 0; }
+.docCardLabel { font-size: 12.5px; font-weight: 650; color: rgba(0,0,0,.75); }
+.docCardFile  { font-size: 11.5px; color: rgba(0,0,0,.50); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.docCardEmpty { font-size: 11.5px; color: rgba(0,0,0,.30); margin-top: 2px; }
+
+.docRemove {
+  background: none; border: none; cursor: pointer;
+  color: rgba(0,0,0,.40); font-size: 11px; padding: 0; line-height: 1;
+}
+.docRemove:hover { color: #c0392b; }
+
+.docUploadBtn {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.06);
+  display: grid; place-items: center;
+  font-size: 14px; font-weight: 700;
+  color: rgba(0,0,0,.55);
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+}
+.docUploadBtn:hover { background: rgba(0,0,0,.12); }
