@@ -255,6 +255,10 @@ function EmployeeModal({ emp, onClose, onSaved }) {
             {DOC_TYPES.map(dt => {
               const existing = existingDocs.find(d => d.name === dt.label);
               const staged   = docFiles[dt.key];
+              // Use backend proxy so download works regardless of Cloudinary access settings
+              const docUrl   = existing?.id
+                ? `${API_BASE}/api/employees/${emp.code}/documents/${existing.id}/download`
+                : null;
               return (
                 <div key={dt.key} className={styles.docCard}>
                   <div className={styles.docCardIcon} style={{ background: dt.color }}>{dt.tag}</div>
@@ -262,14 +266,17 @@ function EmployeeModal({ emp, onClose, onSaved }) {
                     <div className={styles.docCardLabel}>{dt.label}</div>
                     {staged
                       ? <div className={styles.docCardFile}>{staged.name} <button className={styles.docRemove} onClick={() => removeDoc(dt.key)}>✕</button></div>
-                      : existing
-                        ? <a className={styles.docCardFile} href={existing.url} target="_blank" rel="noreferrer">{existing.size} — view</a>
-                        : <div className={styles.docCardEmpty}>No file</div>
+                      : docUrl
+                        ? <div className={styles.docCardFile}>
+                            <span>{existing.size}</span>
+                            <a href={docUrl} download className={styles.docLink}>⬇ Download</a>
+                          </div>
+                        : <div className={styles.docCardEmpty}>No file uploaded</div>
                     }
                   </div>
                   <label className={styles.docUploadBtn} title={`Upload ${dt.label}`}>
                     ↑
-                    <input type="file" style={{ display: "none" }} onChange={e => onDocChange(dt.key, e)} />
+                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={e => onDocChange(dt.key, e)} />
                   </label>
                 </div>
               );
@@ -416,7 +423,10 @@ export default function PeoplePage() {
                 <tr key={emp.code || i} className={styles.tr}>
                   <td className={styles.tdCheck}><span className={styles.checkBox} /></td>
                   <td className={styles.tdEmp}>
-                    <div className={styles.avatar} style={{ background: avatarColor(emp.name) }}>{initials(emp.name)}</div>
+                    {emp.photoUrl
+                      ? <img src={emp.photoUrl} alt={emp.name} className={styles.avatarImg} />
+                      : <div className={styles.avatar} style={{ background: avatarColor(emp.name) }}>{initials(emp.name)}</div>
+                    }
                     <div>
                       <div className={styles.empName}>{emp.name}</div>
                       <div className={styles.empRole}>{emp.role}</div>

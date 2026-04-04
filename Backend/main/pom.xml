@@ -77,6 +77,13 @@
 			<version>1.39.0</version>
 		</dependency>
 
+		<!-- AWS S3 document storage -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.60</version>
+		</dependency>
+
 		<!-- Tests -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
