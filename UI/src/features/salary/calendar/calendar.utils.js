@@ -49,7 +49,8 @@ export function buildCalendarGrid({ calendarDays, year, month }) {
     const striped = db ? db.striped : false;
     const event = db ? db.event : false;
     const eventLabel = db ? db.eventLabel : "";
-    cells.push({ label: String(d), striped, event, eventLabel });
+    const globalEvents = db ? db.globalEvents : undefined;
+    cells.push({ label: String(d), striped, event, eventLabel, globalEvents });
   }
 
 

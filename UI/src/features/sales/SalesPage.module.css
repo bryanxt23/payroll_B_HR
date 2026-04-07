@@ -253,13 +253,17 @@
 .tableHeader,
 .row {
   display: grid;
-  grid-template-columns: 36px 1.8fr 1.4fr 110px 110px 110px 120px 90px;
+  grid-template-columns: 1.6fr 1.8fr 110px 110px 110px 110px 120px 127px;
   align-items: center;
   column-gap: 10px;
 }
 
 .tableHeader {
-  padding: 12px 18px;
+  display: grid;
+  grid-template-columns: 1.6fr 1.8fr 110px 110px 110px 110px 120px 127px;
+  align-items: center;
+  column-gap: 10px;
+  padding: 12px 16px;
   color: #7a756f;
   font-size: 13px;
   font-weight: 500;
@@ -295,15 +299,25 @@
 
 .colItem    { font-size: 13px; font-weight: 700; color: #1e1e1e; }
 
-.colTotal, .colMonthly, .colBalance {
+.colTotal, .colMonthly, .colBalance, .colPayableMonth {
   font-size: 13px;
   font-weight: 600;
   color: #2e2e2e;
+  text-align: center;
 }
+
+
+.partialThisMonth { color: #e07a3a; }
+.paidThisMonth    { color: #2a9d8f; font-size: 12px; }
 
 .colPurchased { font-size: 12px; color: #777; }
 
 .colDue { font-size: 12px; color: #777; }
+
+.tableHeader .colTotal,
+.tableHeader .colMonthly,
+.tableHeader .colBalance,
+.tableHeader .colPayableMonth { text-align: center; }
 
 /* ── Pagination ─────────────────────────────────────────────────── */
 .pagination {
@@ -680,6 +694,7 @@ input[type="checkbox"] {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 24px;
+  padding-right: 10px;
 }
 
 .cancelBtn {
@@ -873,3 +888,465 @@ input[type="checkbox"] {
 }
 .dateInput:focus { outline: none; border-color: #e0ad28; }
 .dateRangeSep { font-size: 12px; color: #aaa; flex-shrink: 0; }
+
+/* ── Item Picker Popup ──────────────────────────────────────────── */
+.itemPickerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.itemPickerCard {
+  background: #fff;
+  border-radius: 20px;
+  width: 520px;
+  max-width: 95vw;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+.itemPickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #f0ece4;
+  flex-shrink: 0;
+}
+
+.itemPickerTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e1e1e;
+  margin: 0;
+}
+
+.itemPickerClose {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: #888;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.itemPickerClose:hover { background: #f2f2f2; color: #333; }
+
+.itemPickerControls {
+  padding: 14px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.itemPickerSearch {
+  width: 100%;
+  box-sizing: border-box;
+  height: 42px;
+  border: 1.5px solid #ddd;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 14px;
+  outline: none;
+  background: #fafafa;
+}
+.itemPickerSearch:focus { border-color: #e0ad28; background: #fff; }
+
+.itemPickerFilter {
+  height: 42px;
+  border: 1.5px solid #ddd;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 14px;
+  background: #fafafa;
+  outline: none;
+  cursor: pointer;
+}
+.itemPickerFilter:focus { border-color: #e0ad28; }
+
+.itemPickerList {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.itemPickerItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1.5px solid #ede9e0;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: #fff;
+}
+.itemPickerItem:hover { border-color: #e0ad28; background: #fffbf0; }
+
+.itemPickerImg {
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1.5px solid #e8e2d6;
+  flex-shrink: 0;
+}
+
+.itemPickerImgPlaceholder {
+  width: 70px;
+  height: 70px;
+  background: #f5f0e8;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.itemPickerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemPickerName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #c8922a;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemPickerMeta {
+  font-size: 13px;
+  color: #666;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.itemPickerCost  { color: #4a8a50; font-weight: 600; }
+.itemPickerSell  { color: #2a6abf; font-weight: 600; }
+
+.itemPickerQtyBadge {
+  margin-left: auto;
+  background: #2a9d8f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.itemPickerEmpty {
+  text-align: center;
+  color: #aaa;
+  font-size: 14px;
+  padding: 32px 0;
+}
+
+/* ── Item trigger button (replaces select) ──────────────────────── */
+.itemTriggerBtn {
+  width: 100%;
+  height: 42px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  background: #fafaf8;
+  padding: 0 14px;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  color: #2b2b2b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+.itemTriggerBtn:hover { border-color: #e0ad28; background: #fff; }
+.itemTriggerPlaceholder { color: #aaa; }
+.itemTriggerArrow { color: #aaa; font-size: 12px; }
+
+/* ── Quick Add Product button (inside item picker) ─────────────── */
+.quickAddBtn {
+  width: 100%;
+  height: 44px;
+  background: #2a9d8f;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  transition: background 0.15s;
+}
+.quickAddBtn:hover { background: #21867a; }
+
+/* ── Quick Add Product modal ────────────────────────────────────── */
+.quickAddOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.quickAddCard {
+  background: #fff;
+  border-radius: 20px;
+  width: 500px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.22);
+  padding: 0 0 24px;
+}
+
+.quickAddGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  padding: 16px 24px 4px;
+}
+
+.quickAddField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.quickAddLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+.quickAddInput {
+  height: 40px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 9px;
+  padding: 0 12px;
+  font-size: 14px;
+  background: #fafaf8;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+.quickAddInput:focus { border-color: #2a9d8f; background: #fff; }
+
+.quickAddNote {
+  margin: 10px 24px 14px;
+  font-size: 12px;
+  color: #999;
+  background: #f7f7f5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  line-height: 1.5;
+}
+
+.quickAddSubmitBtn {
+  height: 42px;
+  padding: 0 28px;
+  background: #2a9d8f;
+  color: #fff;
+  border: none;
+  border-radius: 22px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.quickAddSubmitBtn:hover:not(:disabled) { background: #21867a; }
+.quickAddSubmitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Payment notes in buyer cell ────────────────────────────────── */
+.buyerNotes {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #888;
+  line-height: 1.5;
+  border-top: 1px dashed #e8e2d6;
+  padding-top: 4px;
+}
+
+/* ── Notes viewer modal ─────────────────────────────────────────── */
+.notesViewCard {
+  background: #fff;
+  border-radius: 20px;
+  width: 460px;
+  max-width: 95vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+.notesViewBody {
+  overflow-y: auto;
+  flex: 1;
+  padding: 12px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notesViewEntry {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  background: #fafaf7;
+  border: 1px solid #ede9e0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #444;
+  line-height: 1.5;
+}
+
+.notesViewIcon { flex-shrink: 0; font-size: 15px; }
+
+/* clickable notes preview in table */
+.buyerNotes { cursor: pointer; }
+.buyerNotes:hover { color: #c8922a; }
+.notesMore { color: #c8922a; font-weight: 600; }
+
+/* ── Info / History button ──────────────────────────────────── */
+.infoBtn {
+  border: 1.5px solid #b8d4f0;
+  background: transparent;
+  color: #4a90d9;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  margin-right: 6px;
+}
+.infoBtn:hover { background: #e8f1fb; color: #2a6fb0; }
+
+/* ── History Modal ──────────────────────────────────────────── */
+.historyCard {
+  background: #fff;
+  border-radius: 20px;
+  width: 500px;
+  max-width: 96vw;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid #f0ede6;
+}
+.historyTitle    { font-size: 17px; font-weight: 700; color: #1e1e1e; }
+.historySubtitle { font-size: 13px; color: #7a7570; margin-top: 2px; }
+
+/* Summary grid */
+.historySummary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  padding: 14px 24px;
+  background: #faf9f6;
+  border-bottom: 1px solid #f0ede6;
+}
+.historySummaryRow   { display: flex; flex-direction: column; gap: 1px; }
+.historySummaryLabel { font-size: 11px; color: #9a9590; text-transform: uppercase; letter-spacing: 0.04em; }
+.historySummaryVal   { font-size: 14px; font-weight: 600; color: #2e2e2e; }
+.historyStatusPaid   { color: #2a9d8f !important; }
+.historyStatusActive { color: #c8922a !important; }
+
+/* Timeline */
+.historyTimelineLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a9590;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 14px 24px 8px;
+}
+.historyTimeline {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.historyEntry {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  position: relative;
+  padding-bottom: 14px;
+}
+.historyEntry:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 18px;
+  bottom: 0;
+  width: 2px;
+  background: #ede9e0;
+}
+.historyEntryDot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #c8922a;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #e8d5b0;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.historyEntryBody {
+  flex: 1;
+  background: #fafaf7;
+  border: 1px solid #ede9e0;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.historyEntryMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.historyEntryAmount    { font-size: 15px; font-weight: 700; color: #2a9d8f; }
+.historyEntryEdit      { font-size: 13px; font-weight: 700; color: #7a70d8; }
+.historyEntryTime      { font-size: 11px; color: #9a9590; }
+.historyEntryNote      { font-size: 13px; color: #555; margin-top: 4px; }
+.historyEntryDotEdit   { background: #7a70d8 !important; box-shadow: 0 0 0 2px #d8d5f5 !important; }
+.historyEmpty          { font-size: 13px; color: #aaa; padding: 16px 0; text-align: center; }

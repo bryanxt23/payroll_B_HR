@@ -90,6 +90,8 @@ public class InventoryController {
         if (updated.getPrice()        != null) item.setPrice(updated.getPrice());
         if (updated.getSupplier()     != null) item.setSupplier(updated.getSupplier());
         if (updated.getSellingPrice() != null) item.setSellingPrice(updated.getSellingPrice());
+        item.setGrams(updated.getGrams());
+        item.setNotes(updated.getNotes());
         String oldImage = item.getImage();
         String newImage = updated.getImage();
         if (!Objects.equals(oldImage, newImage)) {

@@ -1,5 +1,7 @@
 package com.payroll.backend.auth;
 
+import com.payroll.backend.employee.Employee;
+import com.payroll.backend.employee.EmployeeRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,11 +15,14 @@ public class AuthController {
 
     private final AppUserRepository    userRepo;
     private final CustomRoleRepository roleRepo;
+    private final EmployeeRepository   employeeRepo;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public AuthController(AppUserRepository userRepo, CustomRoleRepository roleRepo) {
+    public AuthController(AppUserRepository userRepo, CustomRoleRepository roleRepo,
+                          EmployeeRepository employeeRepo) {
         this.userRepo = userRepo;
         this.roleRepo = roleRepo;
+        this.employeeRepo = employeeRepo;
     }
 
     @PostMapping("/login")
@@ -100,7 +105,17 @@ public class AuthController {
         response.put("role",          role);
         response.put("clientId",      user.getClientId());
         response.put("allowedStores", user.getAllowedStores() != null ? user.getAllowedStores() : "");
+        response.put("employeeCode", user.getEmployeeCode() != null ? user.getEmployeeCode() : "");
         response.put("permissions",   permissions);
+
+        // Include linked employee's photo and name
+        if (user.getEmployeeCode() != null && !user.getEmployeeCode().isBlank()) {
+            employeeRepo.findByCode(user.getEmployeeCode()).ifPresent(emp -> {
+                response.put("photoUrl", emp.getPhotoUrl() != null ? emp.getPhotoUrl() : "");
+                response.put("employeeName", emp.getName() != null ? emp.getName() : "");
+            });
+        }
+
         return response;
     }
 }

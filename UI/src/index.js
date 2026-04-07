@@ -31,6 +31,7 @@ window.fetch = function (resource, options = {}) {
     const user = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || 'null');
     if (user && user.role && !headers.has('X-User-Role')) headers.set('X-User-Role', user.role);
     if (user && user.username && !headers.has('X-Username')) headers.set('X-Username', user.username);
+    if (user && user.employeeCode && !headers.has('X-Employee-Code')) headers.set('X-Employee-Code', user.employeeCode);
   } catch (e) { /* ignore */ }
 
   return _nativeFetch(resource, { ...options, headers });

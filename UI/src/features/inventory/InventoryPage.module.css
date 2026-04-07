@@ -216,14 +216,14 @@
 .tableHeader,
 .row {
   display: grid;
-  grid-template-columns: 36px minmax(140px, 1.4fr) minmax(80px, 0.7fr) minmax(110px, 0.9fr) 50px minmax(80px, 0.7fr) minmax(100px, 0.9fr) minmax(90px, 0.8fr) 32px;
+  grid-template-columns: 36px minmax(140px, 1.4fr) minmax(80px, 0.7fr) minmax(110px, 0.9fr) 50px minmax(80px, 0.7fr) minmax(100px, 0.9fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) 32px;
   align-items: center;
   column-gap: 8px;
 }
 
 .tableHeader.rowRestricted,
 .row.rowRestricted {
-  grid-template-columns: 36px minmax(140px, 1.4fr) minmax(80px, 0.7fr) minmax(110px, 0.9fr) 50px minmax(90px, 0.8fr) 32px;
+  grid-template-columns: 36px minmax(140px, 1.4fr) minmax(80px, 0.7fr) minmax(110px, 0.9fr) 50px minmax(90px, 0.8fr) minmax(90px, 0.8fr) 32px;
 }
 
 .tableHeader {
@@ -256,6 +256,7 @@
 .colPrice,
 .colSupplier,
 .colSelling,
+.colTotalGrams,
 .colMenu {
   display: flex;
   align-items: center;
@@ -265,7 +266,8 @@
 .colQty,
 .colPrice,
 .colSupplier,
-.colSelling {
+.colSelling,
+.colTotalGrams {
   color: #5f5b57;
   font-size: 14px;
   font-weight: 400;
@@ -273,6 +275,11 @@
 
 .colPrice,
 .colSelling {
+  font-weight: 600;
+  color: #3a3a3a;
+}
+
+.colTotalGrams {
   font-weight: 600;
   color: #3a3a3a;
 }
@@ -324,7 +331,7 @@
   background: #e2b22f;
 }
 
-.pendingPill {
+.preOrderPill {
   background: #c9c7c7;
 }
 
@@ -524,12 +531,12 @@ input[type="checkbox"] {
 
   .tableHeader,
   .row {
-    grid-template-columns: 32px minmax(120px, 1.2fr) minmax(70px, 0.6fr) minmax(100px, 0.8fr) 44px minmax(70px, 0.6fr) minmax(90px, 0.8fr) minmax(80px, 0.7fr) 28px;
+    grid-template-columns: 32px minmax(120px, 1.2fr) minmax(70px, 0.6fr) minmax(100px, 0.8fr) 44px minmax(70px, 0.6fr) minmax(90px, 0.8fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 28px;
   }
 
   .tableHeader.rowRestricted,
   .row.rowRestricted {
-    grid-template-columns: 32px minmax(120px, 1.2fr) minmax(70px, 0.6fr) minmax(100px, 0.8fr) 44px minmax(80px, 0.7fr) 28px;
+    grid-template-columns: 32px minmax(120px, 1.2fr) minmax(70px, 0.6fr) minmax(100px, 0.8fr) 44px minmax(80px, 0.7fr) minmax(80px, 0.7fr) 28px;
   }
 }
 /* ── Search in header ────────────────────────────────────────────── */
@@ -549,8 +556,8 @@ input[type="checkbox"] {
 .emptyMsg { text-align: center; padding: 32px 0; color: #aaa; font-size: 14px; }
 
 /* ── Modal overlay ───────────────────────────────────────────────── */
-.modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modalCard { background: #fff; border-radius: 20px; padding: 32px 36px; width: 520px; max-width: 96vw; box-shadow: 0 20px 60px rgba(0,0,0,0.18); }
+.modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.modalCard { background: #fff; border-radius: 20px; padding: 32px 36px; width: 520px; max-width: 96vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.18); }
 .modalTitle { font-size: 20px; font-weight: 800; margin-bottom: 24px; color: #1a1a1a; }
 
 /* ── Form grid ───────────────────────────────────────────────────── */

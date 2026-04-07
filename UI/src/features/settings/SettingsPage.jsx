@@ -22,7 +22,7 @@ const STORES = [
   { id: 5, name: "MR STYLES STORE 5" },
 ];
 
-const EMPTY_USER = { username: "", email: "", password: "", role: "user", allowedStores: "" };
+const EMPTY_USER = { username: "", email: "", password: "", role: "user", allowedStores: "", employeeCode: "" };
 const EMPTY_ROLE = {
   name: "",
   canAddSales: false, canEditSales: false, canDeleteSales: false,
@@ -51,6 +51,8 @@ export default function SettingsPage() {
   const [userSaving,    setUserSaving]    = useState(false);
   const [userError,     setUserError]     = useState("");
 
+  const [employees,     setEmployees]     = useState([]);
+
   const [roles,         setRoles]         = useState([]);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [editRole,      setEditRole]      = useState(null);
@@ -61,6 +63,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchEmployees();
   }, []); // eslint-disable-line
 
   const fetchUsers = () =>
@@ -77,6 +80,10 @@ export default function SettingsPage() {
   const fetchRoles = () =>
     fetch(`${API}/api/roles`).then(r => r.json())
       .then(d => setRoles(Array.isArray(d) ? d : [])).catch(() => {});
+
+  const fetchEmployees = () =>
+    fetch(`${API}/api/employees`).then(r => r.json())
+      .then(d => setEmployees(Array.isArray(d) ? d : [])).catch(() => {});
 
   const availableRoles = [
     "Admin", "user", "userS", "userI", "userSI",
@@ -107,7 +114,7 @@ export default function SettingsPage() {
   // ── User CRUD ─────────────────────────────────────────────────────
   const openAddUser  = () => { setUserForm(EMPTY_USER); setEditUser(null); setUserError(""); setShowUserModal(true); };
   const openEditUser = (u) => {
-    setUserForm({ username: u.username, email: u.email || "", password: "", role: u.role, allowedStores: u.allowedStores || "" });
+    setUserForm({ username: u.username, email: u.email || "", password: "", role: u.role, allowedStores: u.allowedStores || "", employeeCode: u.employeeCode || "" });
     setEditUser(u); setUserError(""); setShowUserModal(true);
   };
   const closeUserModal = () => { setShowUserModal(false); setEditUser(null); setUserForm(EMPTY_USER); setUserError(""); };
@@ -118,12 +125,16 @@ export default function SettingsPage() {
       setUserError("Username 'admin' is reserved and cannot be created.");
       return;
     }
+    if (roleNeedsStores(userForm.role) && !userForm.employeeCode) {
+      setUserError("Please link this user to an employee. Create the employee first in the People page.");
+      return;
+    }
     setUserSaving(true); setUserError("");
     const url    = editUser ? `${API}/api/users/${editUser.id}` : `${API}/api/users`;
     const method = editUser ? "PUT" : "POST";
     const body   = { ...userForm };
     if (editUser && !body.password) delete body.password;
-    if (!roleNeedsStores(body.role)) body.allowedStores = "";
+    if (!roleNeedsStores(body.role)) { body.allowedStores = ""; body.employeeCode = ""; }
 
     fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
@@ -196,7 +207,7 @@ export default function SettingsPage() {
               <thead>
                 <tr>
                   <th>Username</th>
-                  <th>Email</th>
+                  <th>Employee</th>
                   <th>Role</th>
                   <th>Allowed Stores</th>
                   <th>Actions</th>
@@ -209,7 +220,11 @@ export default function SettingsPage() {
                       {u.username}
                       {u.username === me.username && <span className={styles.youBadge}>You</span>}
                     </td>
-                    <td>{u.email || "—"}</td>
+                    <td>{(() => {
+                      if (!u.employeeCode) return <span style={{ color: "#aaa" }}>—</span>;
+                      const emp = employees.find(e => e.code === u.employeeCode);
+                      return emp ? emp.name : u.employeeCode;
+                    })()}</td>
                     <td>
                       <span className={`${styles.roleBadge} ${roleBadgeClass(u.role)}`}>{u.role}</span>
                     </td>
@@ -318,12 +333,40 @@ export default function SettingsPage() {
               <div className={styles.field}>
                 <label>Role <span className={styles.req}>*</span></label>
                 <select className={styles.input} value={userForm.role}
-                  onChange={e => setUserForm(f => ({ ...f, role: e.target.value, allowedStores: "" }))}>
+                  onChange={e => setUserForm(f => ({ ...f, role: e.target.value, allowedStores: "", employeeCode: e.target.value === "Admin" ? "" : f.employeeCode }))}>
                   {availableRoles.map(r => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
               </div>
+
+              {/* Employee link — required for non-Admin roles */}
+              {roleNeedsStores(userForm.role) && (
+                <div className={styles.field}>
+                  <label>Linked Employee <span className={styles.req}>*</span></label>
+                  <select className={styles.input} value={userForm.employeeCode}
+                    onChange={e => setUserForm(f => ({ ...f, employeeCode: e.target.value }))}>
+                    <option value="">— Select Employee —</option>
+                    {employees
+                      .filter(emp => emp.status !== "Inactive")
+                      .map(emp => {
+                        const taken = users.some(u =>
+                          u.employeeCode === emp.code && (!editUser || u.id !== editUser.id)
+                        );
+                        return (
+                          <option key={emp.code} value={emp.code} disabled={taken}>
+                            {emp.name}{emp.role ? ` — ${emp.role}` : ""}{taken ? " (already linked)" : ""}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  {employees.length === 0 && (
+                    <div className={styles.hint} style={{ marginTop: 4, color: "#c0392b" }}>
+                      No employees found. Please add employees in the People page first.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Store checkboxes — only for non-Admin roles */}
               {roleNeedsStores(userForm.role) && (

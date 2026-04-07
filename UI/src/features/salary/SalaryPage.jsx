@@ -154,17 +154,70 @@ export default function SalaryPage() {
 
   }, [selectedCode]);
 
-  // Load calendar data for selected employee + month/year
+  // Load calendar data for selected employee + merge global calendar events
   useEffect(() => {
     if (!selectedCode) return;
 
+    const empCalUrl = `${API_BASE}/api/employees/${selectedCode}/calendar?year=${selectedYear}&month=${Number(selectedMonth) + 1}`;
+    const eventsUrl = `${API_BASE}/api/calendar/events?year=${selectedYear}&month=${Number(selectedMonth) + 1}&employeeCode=${selectedCode}`;
 
-    
+    Promise.all([
+      fetch(empCalUrl).then(r => r.ok ? r.json() : []),
+      fetch(eventsUrl).then(r => r.ok ? r.json() : []).catch(() => []),
+    ])
+    .then(([empData, globalEvents]) => {
+      const empDays = Array.isArray(empData) ? empData : [];
 
-    fetch(`${API_BASE}/api/employees/${selectedCode}/calendar?year=${selectedYear}&month=${Number(selectedMonth) + 1}`)
-    .then((r) => r.json())
-    .then((data) => {
-      setCalendarDays(Array.isArray(data) ? data : []);
+      // Merge global calendar events into employee calendar days
+      const daysInMonth = new Date(selectedYear, Number(selectedMonth) + 1, 0).getDate();
+      const empMap = {};
+      empDays.forEach(d => { empMap[d.day] = d; });
+
+      // Build events-by-day from global calendar events
+      const eventsByDay = {};
+      (Array.isArray(globalEvents) ? globalEvents : []).forEach(ev => {
+        const start = new Date(ev.startDate + "T00:00:00");
+        const end = new Date(ev.endDate + "T00:00:00");
+        const cur = new Date(start);
+        while (cur <= end) {
+          if (cur.getFullYear() === selectedYear && cur.getMonth() === Number(selectedMonth)) {
+            const day = cur.getDate();
+            if (!eventsByDay[day]) eventsByDay[day] = [];
+            eventsByDay[day].push(ev);
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+      });
+
+      // Merge: employee calendar data + global events
+      const merged = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const emp = empMap[d];
+        const globalEvs = eventsByDay[d] || [];
+        const eventLabels = globalEvs.map(e => e.title);
+
+        if (emp) {
+          // If employee already has event data, append global event labels
+          const combinedLabel = [emp.eventLabel, ...eventLabels].filter(Boolean).join(", ");
+          merged.push({
+            ...emp,
+            event: emp.event || globalEvs.length > 0,
+            eventLabel: combinedLabel || emp.eventLabel,
+            globalEvents: globalEvs,
+          });
+        } else if (globalEvs.length > 0) {
+          // No employee-specific data but there are global events
+          merged.push({
+            day: d,
+            striped: false,
+            event: true,
+            eventLabel: eventLabels.join(", "),
+            globalEvents: globalEvs,
+          });
+        }
+      }
+
+      setCalendarDays(merged);
     })
     .catch((err) => {
       if (err.name !== "AbortError") {

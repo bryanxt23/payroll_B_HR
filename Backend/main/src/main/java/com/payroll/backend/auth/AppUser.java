@@ -29,6 +29,10 @@ public class AppUser {
     @Column(name = "allowed_stores")
     private String allowedStores;
 
+    /** Links this user to an employee record by employee code. */
+    @Column(name = "employee_code")
+    private String employeeCode;
+
     public Long getId() { return id; }
 
     public String getUsername() { return username; }
@@ -48,4 +52,7 @@ public class AppUser {
 
     public String getAllowedStores() { return allowedStores; }
     public void setAllowedStores(String allowedStores) { this.allowedStores = allowedStores; }
+
+    public String getEmployeeCode() { return employeeCode; }
+    public void setEmployeeCode(String employeeCode) { this.employeeCode = employeeCode; }
 }

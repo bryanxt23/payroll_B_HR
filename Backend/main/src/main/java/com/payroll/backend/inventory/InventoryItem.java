@@ -24,6 +24,11 @@ public class InventoryItem {
     @Column(name = "selling_price")
     private Double sellingPrice;
 
+    private Double grams;
+
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     @Column(columnDefinition = "TEXT")
     private String image;
 
@@ -67,6 +72,12 @@ public class InventoryItem {
 
     public Double getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(Double sellingPrice) { this.sellingPrice = sellingPrice; }
+
+    public Double getGrams() { return grams; }
+    public void setGrams(Double grams) { this.grams = grams; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public String getImage() { return image; }
     public void setImage(String image) { this.image = image; }

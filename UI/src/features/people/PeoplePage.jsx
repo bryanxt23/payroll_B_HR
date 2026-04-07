@@ -45,12 +45,14 @@ function EmployeeModal({ emp, onClose, onSaved }) {
   const [photoFile, setPhotoFile]       = useState(null);
   const [docFiles, setDocFiles]         = useState({}); // { contract: File, resume: File, cv: File }
   const [existingDocs, setExistingDocs] = useState([]);
+  const [otherDocs, setOtherDocs]       = useState([]); // [{ name: string, file: File|null }]
+  const [existingOtherDocs, setExistingOtherDocs] = useState([]);
   const isEdit     = !!emp;
   const overlayRef = useRef(null);
   const photoRef   = useRef(null);
 
   useEffect(() => {
-    if (!emp) { setForm(EMPTY_FORM); setPhotoPreview(null); setPhotoFile(null); setDocFiles({}); setExistingDocs([]); return; }
+    if (!emp) { setForm(EMPTY_FORM); setPhotoPreview(null); setPhotoFile(null); setDocFiles({}); setExistingDocs([]); setOtherDocs([]); setExistingOtherDocs([]); return; }
     const base = {
       name:        emp.name        || "",
       role:        emp.role        || "",
@@ -63,6 +65,7 @@ function EmployeeModal({ emp, onClose, onSaved }) {
     setPhotoPreview(emp.photoUrl || null);
     setPhotoFile(null);
     setDocFiles({});
+    setOtherDocs([]);
 
     // Fetch profile + documents
     Promise.all([
@@ -78,7 +81,10 @@ function EmployeeModal({ emp, onClose, onSaved }) {
         city:        p.city        || "",
         address:     p.address     || "",
       }));
-      setExistingDocs(Array.isArray(docs) ? docs : []);
+      const allDocs = Array.isArray(docs) ? docs : [];
+      const knownLabels = DOC_TYPES.map(d => d.label);
+      setExistingDocs(allDocs.filter(d => knownLabels.includes(d.name)));
+      setExistingOtherDocs(allDocs.filter(d => !knownLabels.includes(d.name)));
     }).catch(() => {});
   }, [emp]);
 
@@ -98,6 +104,12 @@ function EmployeeModal({ emp, onClose, onSaved }) {
   }
 
   function removeDoc(key) { setDocFiles(d => { const n = { ...d }; delete n[key]; return n; }); }
+
+  function addOtherDoc() { setOtherDocs(d => [...d, { name: "", file: null }]); }
+  function updateOtherDoc(idx, field, value) {
+    setOtherDocs(d => d.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+  }
+  function removeOtherDoc(idx) { setOtherDocs(d => d.filter((_, i) => i !== idx)); }
 
   async function save() {
     if (!form.name.trim()) { setError("Name is required."); return; }
@@ -157,6 +169,17 @@ function EmployeeModal({ emp, onClose, onSaved }) {
         fd.append("name", dt.label);
         fd.append("type", dt.type);
         fd.append("tag",  dt.tag);
+        await fetch(`${API_BASE}/api/employees/${code}/documents`, { method: "POST", body: fd });
+      }
+
+      // Upload other documents
+      for (const od of otherDocs) {
+        if (!od.file || !od.name.trim()) continue;
+        const fd = new FormData();
+        fd.append("file", od.file);
+        fd.append("name", od.name.trim());
+        fd.append("type", od.file.name.split(".").pop() || "pdf");
+        fd.append("tag", od.name.trim().charAt(0).toUpperCase());
         await fetch(`${API_BASE}/api/employees/${code}/documents`, { method: "POST", body: fd });
       }
 
@@ -282,6 +305,55 @@ function EmployeeModal({ emp, onClose, onSaved }) {
               );
             })}
           </div>
+
+          {/* Other Documents */}
+          <div className={styles.modalSection}>Other Documents</div>
+          <div className={styles.docsGrid}>
+            {existingOtherDocs.map((doc, i) => {
+              const docUrl = doc.id ? `${API_BASE}/api/employees/${emp.code}/documents/${doc.id}/download` : null;
+              return (
+                <div key={`existing-other-${i}`} className={styles.docCard}>
+                  <div className={styles.docCardIcon} style={{ background: "#7f8c8d" }}>{(doc.name || "?").charAt(0).toUpperCase()}</div>
+                  <div className={styles.docCardInfo}>
+                    <div className={styles.docCardLabel}>{doc.name}</div>
+                    {docUrl
+                      ? <div className={styles.docCardFile}>
+                          <span>{doc.size}</span>
+                          <a href={docUrl} download className={styles.docLink}>⬇ Download</a>
+                        </div>
+                      : <div className={styles.docCardEmpty}>No file</div>
+                    }
+                  </div>
+                </div>
+              );
+            })}
+            {otherDocs.map((od, idx) => (
+              <div key={`other-${idx}`} className={styles.docCard}>
+                <div className={styles.docCardIcon} style={{ background: od.name ? "#7f8c8d" : "#bbb" }}>
+                  {od.name ? od.name.charAt(0).toUpperCase() : "?"}
+                </div>
+                <div className={styles.docCardInfo}>
+                  <input
+                    className={styles.input}
+                    value={od.name}
+                    onChange={e => updateOtherDoc(idx, "name", e.target.value)}
+                    placeholder="Document name"
+                    style={{ marginBottom: 4, fontSize: "12px", padding: "4px 8px" }}
+                  />
+                  {od.file
+                    ? <div className={styles.docCardFile}>{od.file.name} <button className={styles.docRemove} onClick={() => updateOtherDoc(idx, "file", null)}>✕</button></div>
+                    : <div className={styles.docCardEmpty}>No file uploaded</div>
+                  }
+                </div>
+                <label className={styles.docUploadBtn} title="Upload file">
+                  ↑
+                  <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) updateOtherDoc(idx, "file", f); }} />
+                </label>
+                <button className={styles.docRemove} onClick={() => removeOtherDoc(idx)} title="Remove" style={{ fontSize: "14px" }}>✕</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className={styles.addDocBtn} onClick={addOtherDoc}>+ Add Document</button>
         </div>
 
         {error && <div className={styles.modalError}>{error}</div>}

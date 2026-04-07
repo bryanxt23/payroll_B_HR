@@ -11,6 +11,7 @@ import ReportsPage from "../features/reports/ReportsPage";
 import SalaryPage from "../features/salary/SalaryPage";
 import PeoplePage from "../features/people/PeoplePage";
 import CalendarPage from "../features/calendar/CalendarPage";
+import TimesheetPage from "../features/timesheet/TimesheetPage";
 
 function getUser() {
   try {
@@ -49,10 +50,11 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/sales"     element={<SalesPage />} />
-                <Route path="/reports"   element={<ReportsPage />} />
                 <Route path="/salary"   element={<SalaryPage />} />
+                <Route path="/timesheet" element={<TimesheetPage />} />
                 <Route path="/people"   element={<PeoplePage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/reports"   element={<ReportsPage />} />
                 <Route path="/settings"  element={
                   <RequireAdmin><SettingsPage /></RequireAdmin>
                 } />

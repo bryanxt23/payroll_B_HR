@@ -29,14 +29,24 @@
   gap:10px;
 }
 
+/* -- Day cell -- */
 .day{
-  height:56px;
-  border-radius:16px;
+  min-height:70px;
+  border-radius:14px;
   border:1px solid rgba(0,0,0,.06);
   background:rgba(255,255,255,.55);
   position:relative;
-  padding:8px;
+  padding:6px 7px;
   font-size:12px;
+  transition: box-shadow .15s;
+}
+
+.day:hover:not(.muted){
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+.hasEvents{
+  cursor:pointer;
 }
 
 .muted{
@@ -47,6 +57,7 @@
   content:"";
   position:absolute;
   inset:0;
+  border-radius:14px;
   background:
     repeating-linear-gradient(
       -45deg,
@@ -55,8 +66,185 @@
       transparent 6px,
       transparent 12px
     );
+  pointer-events:none;
 }
 
+.dayLabel{
+  font-weight:600;
+  font-size:12px;
+  color:rgba(0,0,0,.55);
+  margin-bottom:2px;
+}
+
+/* -- Indicators (max 2 + more) -- */
+.indicators{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+
+.indicator{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  min-width:0;
+}
+
+.indicatorDot{
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
+.indicatorText{
+  font-size:9.5px;
+  font-weight:600;
+  color:rgba(0,0,0,.60);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  line-height:1.3;
+}
+
+.moreTag{
+  font-size:9px;
+  font-weight:700;
+  color:rgba(0,0,0,.40);
+  margin-top:1px;
+}
+
+/* -- Day detail popup -- */
+.dayPopup{
+  position:absolute;
+  top:0;
+  left:calc(100% + 6px);
+  width:240px;
+  background:rgba(255,255,255,.97);
+  backdrop-filter:blur(12px);
+  border:1.5px solid rgba(0,0,0,.08);
+  border-radius:14px;
+  box-shadow:0 12px 32px rgba(0,0,0,.15);
+  z-index:50;
+  overflow:hidden;
+}
+
+.popupHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px 8px;
+  border-bottom:1px solid rgba(0,0,0,.06);
+}
+
+.popupDate{
+  font-size:13px;
+  font-weight:750;
+  color:rgba(0,0,0,.75);
+}
+
+.popupClose{
+  width:22px;height:22px;
+  border-radius:50%;
+  border:none;
+  background:rgba(0,0,0,.06);
+  display:grid;place-items:center;
+  cursor:pointer;
+  font-size:11px;
+  color:rgba(0,0,0,.45);
+}
+.popupClose:hover{background:rgba(0,0,0,.10);}
+
+.popupBody{
+  padding:8px 12px 10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:260px;
+  overflow:auto;
+}
+
+.popupItem{
+  padding:6px 8px;
+  border-radius:8px;
+  background:rgba(0,0,0,.025);
+  border:1px solid rgba(0,0,0,.04);
+}
+
+.popupItemHeader{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.popupDot{
+  width:7px;height:7px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
+.popupTitle{
+  font-size:12px;
+  font-weight:700;
+  color:rgba(0,0,0,.75);
+  flex:1;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.popupType{
+  font-size:9.5px;
+  font-weight:600;
+  color:rgba(0,0,0,.40);
+  background:rgba(0,0,0,.05);
+  padding:1px 6px;
+  border-radius:4px;
+  white-space:nowrap;
+}
+
+.popupDetails{
+  margin-top:5px;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+
+.popupDetail{
+  font-size:11px;
+  color:rgba(0,0,0,.55);
+  line-height:1.4;
+}
+
+.popupDetailLabel{
+  font-weight:700;
+  color:rgba(0,0,0,.45);
+  margin-right:6px;
+  font-size:10px;
+  text-transform:uppercase;
+}
+
+.popupSalaryBadge{
+  display:inline-flex;
+  align-items:center;
+  margin-top:3px;
+  padding:2px 8px;
+  border-radius:6px;
+  background:rgba(39,174,96,.12);
+  color:#1e8449;
+  font-size:10px;
+  font-weight:700;
+  width:fit-content;
+}
+
+.popupEmpty{
+  padding:12px;
+  text-align:center;
+  font-size:12px;
+  color:rgba(0,0,0,.35);
+}
+
+/* -- Legacy styles (kept for compatibility) -- */
 .event{
   background:rgba(246,200,71,.55);
 }

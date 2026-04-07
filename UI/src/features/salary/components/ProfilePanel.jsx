@@ -1,5 +1,6 @@
 import React from "react";
 import Icon from "../../../components/ui/Icon";
+import API_BASE from "../../../config";
 import styles from "./ProfilePanel.module.css";
 
 function initials(name = "") {
@@ -57,22 +58,37 @@ export default function ProfilePanel({ profile }) {
 
         <div className={styles.blockTitle}>Documents</div>
         <div className={styles.docRow}>
-          {docs.map((d) => (
-            <div className={styles.doc} key={d.name}>
-              <div
-                className={`${styles.docIcon} ${
-                  d.type === "word" ? styles.word : styles.ppt
-                }`}
-              >
-                {d.tag}
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <div className={styles.docName}>{d.name}</div>
-                <div className={styles.docSize}>{d.size}</div>
-              </div>
+          {docs.length === 0 && (
+            <div style={{ fontSize: 12, color: "rgba(0,0,0,.35)", padding: "8px 0" }}>
+              No documents uploaded yet.
             </div>
-          ))}
+          )}
+          {docs.map((d) => {
+            const downloadUrl = d.id && profile.code
+              ? `${API_BASE}/api/employees/${profile.code}/documents/${d.id}/download`
+              : null;
+            return (
+              <div
+                className={`${styles.doc} ${downloadUrl ? styles.docClickable : ""}`}
+                key={d.id || d.name}
+                onClick={() => downloadUrl && window.open(downloadUrl, "_blank")}
+                title={downloadUrl ? `Click to view ${d.name}` : d.name}
+              >
+                <div
+                  className={`${styles.docIcon} ${
+                    d.type === "word" ? styles.word : styles.ppt
+                  }`}
+                >
+                  {d.tag || d.type?.[0]?.toUpperCase() || "F"}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className={styles.docName}>{d.name}</div>
+                  <div className={styles.docSize}>{d.size}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className={styles.blockTitle}>Statistics</div>

@@ -6,10 +6,11 @@ const tabs = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Inventory", path: "/inventory" },
   { label: "Sales",     path: "/sales" },
-  { label: "Reports",   path: "/reports" },
   { label: "Salary",    path: "/salary" },
+  { label: "Timesheet", path: "/timesheet" },
   { label: "People",    path: "/people" },
   { label: "Calendar",  path: "/calendar" },
+  { label: "Reports",   path: "/reports" },
 ];
 
 const ALL_STORES = [
@@ -140,9 +141,12 @@ export default function Topbar() {
           </button>
         )}
         <div className={styles.userInfo}>
-          <div className={styles.userAvatar}>{user?.username?.[0]?.toUpperCase() || "?"}</div>
+          {user?.photoUrl
+            ? <img src={user.photoUrl} alt={user.username} className={styles.userAvatarImg} />
+            : <div className={styles.userAvatar}>{user?.username?.[0]?.toUpperCase() || "?"}</div>
+          }
           <div className={styles.userDetails}>
-            <div className={styles.userName}>{user?.username}</div>
+            <div className={styles.userName}>{user?.employeeName || user?.username}</div>
             <div className={styles.userRole}>{user?.role}</div>
           </div>
         </div>

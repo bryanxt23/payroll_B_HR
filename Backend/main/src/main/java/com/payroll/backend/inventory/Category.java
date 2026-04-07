@@ -3,7 +3,8 @@ package com.payroll.backend.inventory;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "inventory_categories")
+@Table(name = "inventory_categories",
+       uniqueConstraints = @UniqueConstraint(columnNames = {"name", "store_id"}))
 public class Category {
 
     @Id

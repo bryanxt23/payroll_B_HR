@@ -20,16 +20,23 @@ public class CategoryController {
 
     @GetMapping
     public List<Category> list() {
-        return repo.findByStoreId(sid());
+        Long storeId = sid();
+        if (storeId == null) return java.util.Collections.emptyList();
+        return repo.findByStoreId(storeId);
     }
 
     @PostMapping
-    public Category create(@RequestBody Map<String, String> body) {
+    public org.springframework.http.ResponseEntity<?> create(@RequestBody Map<String, String> body) {
         String name = body.get("name");
-        if (name == null || name.isBlank()) throw new RuntimeException("Name is required");
+        if (name == null || name.isBlank())
+            return org.springframework.http.ResponseEntity.badRequest().body("Name is required");
         if (repo.existsByNameAndStoreId(name.trim(), sid()))
-            throw new RuntimeException("Category already exists");
-        return repo.save(new Category(name.trim(), sid()));
+            return org.springframework.http.ResponseEntity.badRequest().body("Category already exists in this store");
+        try {
+            return org.springframework.http.ResponseEntity.ok(repo.save(new Category(name.trim(), sid())));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body("Category already exists");
+        }
     }
 
     @PutMapping("/{id}")

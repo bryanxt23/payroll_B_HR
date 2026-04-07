@@ -31,6 +31,7 @@ public class UserController {
         m.put("email",         u.getEmail() != null ? u.getEmail() : "");
         m.put("role",          u.getRole());
         m.put("allowedStores", u.getAllowedStores() != null ? u.getAllowedStores() : "");
+        m.put("employeeCode", u.getEmployeeCode() != null ? u.getEmployeeCode() : "");
         m.put("clientId",      u.getClientId());
         return m;
     }
@@ -65,6 +66,9 @@ public class UserController {
         String as = body.containsKey("allowedStores") ? String.valueOf(body.get("allowedStores")) : "";
         user.setAllowedStores(as.isBlank() ? null : as);
 
+        String ec = body.containsKey("employeeCode") ? String.valueOf(body.get("employeeCode")) : "";
+        user.setEmployeeCode(ec.isBlank() ? null : ec);
+
         return toMap(userRepo.save(user));
     }
 
@@ -92,6 +96,10 @@ public class UserController {
             } else {
                 user.setAllowedStores(as.isBlank() ? null : as);
             }
+        }
+        if (body.containsKey("employeeCode")) {
+            String ec = String.valueOf(body.get("employeeCode"));
+            user.setEmployeeCode(ec.isBlank() ? null : ec);
         }
 
         return toMap(userRepo.save(user));

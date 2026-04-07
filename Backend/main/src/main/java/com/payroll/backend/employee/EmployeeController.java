@@ -2,6 +2,7 @@ package com.payroll.backend.employee;
 
 import com.payroll.backend.inventory.CloudinaryService;
 import com.payroll.backend.inventory.S3Service;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,23 @@ public class EmployeeController {
     }
 
     @GetMapping
-    public List<Employee> list() {
+    public List<Employee> list(HttpServletRequest req,
+                               @RequestParam(value = "all", required = false) Boolean all) {
+        // ?all=true bypasses role filter (for attendee pickers, etc.)
+        if (Boolean.TRUE.equals(all)) {
+            return repo.findAll();
+        }
+
+        String role = req.getHeader("X-User-Role");
+        String empCode = req.getHeader("X-Employee-Code");
+
+        // Non-admin users only see their own linked employee
+        if (!"Admin".equals(role) && empCode != null && !empCode.isBlank()) {
+            return repo.findByCode(empCode)
+                    .map(List::of)
+                    .orElse(List.of());
+        }
+
         return repo.findAll();
     }
 

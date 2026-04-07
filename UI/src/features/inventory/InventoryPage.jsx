@@ -12,10 +12,10 @@ function getUser() {
   catch { return null; }
 }
 function authUsername() { return getUser()?.username || "system"; }
-const STATUSES = ["In Stock", "Pending", "Out of Stock"];
-const TABS     = ["All", "In Stock", "Pending", "Out of Stock"];
+const STATUSES = ["In Stock", "Out of Stock", "Pre Order"];
+const TABS     = ["All", "In Stock", "Out of Stock", "Pre Order"];
 const PAGE_SIZE = 7;
-const EMPTY_FORM = { name: "", category: "", status: "In Stock", quantity: "", price: "", supplier: "", sellingPrice: "", image: "" };
+const EMPTY_FORM = { name: "", category: "", status: "In Stock", quantity: "", grams: "", price: "", supplier: "", sellingPrice: "", notes: "", image: "" };
 
 function buildPagerPages(page, totalPages) {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i);
@@ -89,16 +89,18 @@ export default function InventoryPage() {
     fetch(`${API}/api/inventory`)
       .then(r => r.json()).then(d => setItems(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`${API}/api/categories`)
-      .then(r => r.json()).then(d => Array.isArray(d) && setCategories(d)).catch(() => {});
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setCategories(Array.isArray(d) ? d.filter(Boolean) : []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => { setPage(0); }, [activeTab, selectedCategories, selectedStatuses, search, sortCol, sortDir]);
 
-  const catNames = useMemo(() => categories.map(c => c.name), [categories]);
+  const catNames = useMemo(() => categories.filter(c => c && c.id != null && c.name).map(c => c.name), [categories]);
 
   const counts = useMemo(() => ({
     inStock:    items.filter(i => i.status === "In Stock").length,
-    pending:    items.filter(i => i.status === "Pending").length,
+    preOrder:   items.filter(i => i.status === "Pre Order").length,
     outOfStock: items.filter(i => i.status === "Out of Stock").length,
   }), [items]);
 
@@ -169,7 +171,7 @@ export default function InventoryPage() {
     const duplicate = items.some(i => i.name?.trim().toLowerCase() === form.name.trim().toLowerCase());
     if (duplicate) { setFormError(`"${form.name}" already exists in inventory.`); return; }
     setFormError(""); setSubmitting(true);
-    const body = { name: form.name, category: form.category, status: form.status, quantity: parseInt(form.quantity)||0, price: parseFloat(form.price)||0, supplier: form.supplier, sellingPrice: parseFloat(form.sellingPrice)||0, image: form.image || null };
+    const body = { name: form.name, category: form.category, status: form.status, quantity: parseInt(form.quantity)||0, grams: form.grams !== "" ? parseFloat(form.grams) : null, price: parseFloat(form.price)||0, supplier: form.supplier, sellingPrice: parseFloat(form.sellingPrice)||0, notes: form.notes || null, image: form.image || null };
     fetch(`${API}/api/inventory`, { method: "POST", headers: { "Content-Type": "application/json", "X-Username": authUsername() }, body: JSON.stringify(body) })
       .then(r => r.json())
       .then(newItem => { setItems(prev => [...prev, newItem]); setShowModal(false); setForm(EMPTY_FORM); })
@@ -179,7 +181,7 @@ export default function InventoryPage() {
   // ── Edit Item ──────────────────────────────────────────────────
   const openEdit = (item) => {
     setEditItem(item);
-    setEditForm({ name: item.name||"", category: item.category||"", status: item.status||"In Stock", quantity: String(item.quantity??0), price: String(item.price??0), supplier: item.supplier||"", sellingPrice: String(item.sellingPrice??0), image: item.image||"" });
+    setEditForm({ name: item.name||"", category: item.category||"", status: item.status||"In Stock", quantity: String(item.quantity??0), grams: item.grams != null ? String(item.grams) : "", price: String(item.price??0), supplier: item.supplier||"", sellingPrice: String(item.sellingPrice??0), notes: item.notes||"", image: item.image||"" });
   };
 
   const handleDelete = (item) => {
@@ -191,7 +193,7 @@ export default function InventoryPage() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault(); setEditSubmitting(true);
-    const body = { name: editForm.name, category: editForm.category, status: editForm.status, quantity: parseInt(editForm.quantity)||0, price: parseFloat(editForm.price)||0, supplier: editForm.supplier, sellingPrice: parseFloat(editForm.sellingPrice)||0, image: editForm.image || null };
+    const body = { name: editForm.name, category: editForm.category, status: editForm.status, quantity: parseInt(editForm.quantity)||0, grams: editForm.grams !== "" ? parseFloat(editForm.grams) : null, price: parseFloat(editForm.price)||0, supplier: editForm.supplier, sellingPrice: parseFloat(editForm.sellingPrice)||0, notes: editForm.notes || null, image: editForm.image || null };
     fetch(`${API}/api/inventory/${editItem.id}`, { method: "PUT", headers: { "Content-Type": "application/json", "X-Username": authUsername() }, body: JSON.stringify(body) })
       .then(r => r.json())
       .then(updated => { setItems(prev => prev.map(i => i.id === updated.id ? updated : i)); setEditItem(null); })
@@ -218,9 +220,9 @@ export default function InventoryPage() {
             <div className={styles.summaryLeft}>
               <div className={styles.summaryItem}><span>In Stock</span><span className={`${styles.countBadge} ${styles.goldBadge}`}>{counts.inStock}</span></div>
               <div className={styles.divider} />
-              <div className={styles.summaryItem}><span>Pending</span><span className={`${styles.countBadge} ${styles.grayBadge}`}>{counts.pending}</span></div>
-              <div className={styles.divider} />
               <div className={styles.summaryItem}><span>Out of Stock</span><span className={`${styles.countBadge} ${styles.redBadge}`}>{counts.outOfStock}</span></div>
+              <div className={styles.divider} />
+              <div className={styles.summaryItem}><span>Pre Order</span><span className={`${styles.countBadge} ${styles.grayBadge}`}>{counts.preOrder}</span></div>
             </div>
             {canAddInventory() && <button className={styles.addBtn} onClick={() => setShowModal(true)}>+ Add Item</button>}
           </div>
@@ -241,6 +243,7 @@ export default function InventoryPage() {
               {isAdmin() && <div className={`${styles.colPrice}    ${styles.sortableCol}`} onClick={() => handleSort("price")}>Price {sortIcon("price")}</div>}
               {isAdmin() && <div className={`${styles.colSupplier} ${styles.sortableCol}`} onClick={() => handleSort("supplier")}>Supplier {sortIcon("supplier")}</div>}
               <div className={`${styles.colSelling}  ${styles.sortableCol}`} onClick={() => handleSort("sellingPrice")}>Selling Price {sortIcon("sellingPrice")}</div>
+              <div className={styles.colTotalGrams}>Total Grams</div>
               <div className={styles.colMenu}></div>
             </div>
 
@@ -260,12 +263,13 @@ export default function InventoryPage() {
                   </div>
                   <div className={styles.colCategory}>{item.category}</div>
                   <div className={styles.colStatus}>
-                    <span className={`${styles.statusPill} ${item.status === "In Stock" ? styles.stockPill : item.status === "Pending" ? styles.pendingPill : styles.outPill}`}>{item.status}</span>
+                    <span className={`${styles.statusPill} ${item.status === "In Stock" ? styles.stockPill : item.status === "Pre Order" ? styles.preOrderPill : styles.outPill}`}>{item.status}</span>
                   </div>
                   <div className={styles.colQty}>{item.quantity ?? 0}</div>
                   {isAdmin() && <div className={styles.colPrice}>₱{fmt(item.price)}</div>}
                   {isAdmin() && <div className={styles.colSupplier}>{item.supplier || "—"}</div>}
                   <div className={styles.colSelling}>₱{fmt(item.sellingPrice)}</div>
+                  <div className={styles.colTotalGrams}>{item.grams != null ? `${((item.grams) * (item.quantity ?? 1)).toLocaleString()}g` : "—"}</div>
                   <div className={styles.colMenu}>
                     {canEditInventory()   && <button className={styles.menuBtn}   onClick={() => openEdit(item)}    title="Edit">✎</button>}
                     {canDeleteInventory() && <button className={styles.deleteBtn} onClick={() => handleDelete(item)} title="Delete">🗑</button>}
@@ -297,11 +301,11 @@ export default function InventoryPage() {
           <div className={styles.filterCard}>
             <div className={styles.cardTop}><span className={styles.cardTitle}>Category</span></div>
             <div className={styles.optionList}>
-              {categories.map(cat => (
+              {categories.filter(c => c && c.id != null).map(cat => (
                 <div key={cat.id} className={styles.catRow}>
-                  {editCat?.id === cat.id ? (
+                  {editCat != null && editCat.id === cat.id ? (
                     <div className={styles.catEditRow}>
-                      <input autoFocus className={styles.catEditInput} value={editCat.name}
+                      <input autoFocus className={styles.catEditInput} value={editCat.name ?? ""}
                         onChange={e => setEditCat(c => ({ ...c, name: e.target.value }))}
                         onKeyDown={e => { if (e.key === "Enter") renameCategory(cat); if (e.key === "Escape") setEditCat(null); }} />
                       <button className={styles.catSaveBtn} onClick={() => renameCategory(cat)}>✓</button>
@@ -336,7 +340,7 @@ export default function InventoryPage() {
             <div className={styles.cardTop}><span className={styles.cardTitle}>Status</span></div>
             <div className={styles.optionList}>
               {STATUSES.map(status => {
-                const count = status==="In Stock" ? counts.inStock : status==="Pending" ? counts.pending : counts.outOfStock;
+                const count = status==="In Stock" ? counts.inStock : status==="Pre Order" ? counts.preOrder : counts.outOfStock;
                 return (
                   <label key={status} className={styles.optionRow}>
                     <div className={styles.optionLeft}>
@@ -394,17 +398,25 @@ export default function InventoryPage() {
                     setForm(f => ({ ...f, quantity: qty, status: parseInt(qty||0) === 0 ? "Out of Stock" : f.status === "Out of Stock" ? "In Stock" : f.status }));
                   }} />
                 </div>
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Grams (g) <span className={styles.req}>*</span></label>
+                  <input type="number" min="0" step="0.01" className={styles.formInput} value={form.grams} required onChange={e => setForm(f=>({...f,grams:e.target.value}))} />
+                </div>
                 {isAdmin() && <div className={styles.formField}>
-                  <label className={styles.formLabel}>Supplier</label>
-                  <input type="text" className={styles.formInput} value={form.supplier} onChange={e => setForm(f=>({...f,supplier:e.target.value}))} />
+                  <label className={styles.formLabel}>Supplier <span className={styles.req}>*</span></label>
+                  <input type="text" className={styles.formInput} value={form.supplier} required onChange={e => setForm(f=>({...f,supplier:e.target.value}))} />
                 </div>}
                 {isAdmin() && <div className={styles.formField}>
-                  <label className={styles.formLabel}>Price (₱) <span className={styles.req}>*</span></label>
+                  <label className={styles.formLabel}>Cost (₱) <span className={styles.req}>*</span></label>
                   <input type="number" min="0" step="0.01" className={styles.formInput} value={form.price} required onChange={e => setForm(f=>({...f,price:e.target.value}))} />
                 </div>}
                 <div className={styles.formField}>
                   <label className={styles.formLabel}>Selling Price (₱) <span className={styles.req}>*</span></label>
                   <input type="number" min="0" step="0.01" className={styles.formInput} value={form.sellingPrice} required onChange={e => setForm(f=>({...f,sellingPrice:e.target.value}))} />
+                </div>
+                <div className={styles.formField} style={{ gridColumn:"1/-1" }}>
+                  <label className={styles.formLabel}>Notes</label>
+                  <textarea className={styles.formInput} rows={3} value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} style={{ resize:"vertical" }} />
                 </div>
                 <div className={styles.formField} style={{ gridColumn:"1/-1" }}>
                   <label className={styles.formLabel}>Item Photo</label>
@@ -460,9 +472,13 @@ export default function InventoryPage() {
                     setEditForm(f => ({ ...f, quantity: qty, status: parseInt(qty||0) === 0 ? "Out of Stock" : f.status === "Out of Stock" ? "In Stock" : f.status }));
                   }} />
                 </div>
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Grams (g) <span className={styles.req}>*</span></label>
+                  <input type="number" min="0" step="0.01" className={styles.formInput} value={editForm.grams} required onChange={e => setEditForm(f=>({...f,grams:e.target.value}))} />
+                </div>
                 {isAdmin() && <div className={styles.formField}>
-                  <label className={styles.formLabel}>Supplier</label>
-                  <input type="text" className={styles.formInput} value={editForm.supplier} onChange={e => setEditForm(f=>({...f,supplier:e.target.value}))} />
+                  <label className={styles.formLabel}>Supplier <span className={styles.req}>*</span></label>
+                  <input type="text" className={styles.formInput} value={editForm.supplier} required onChange={e => setEditForm(f=>({...f,supplier:e.target.value}))} />
                 </div>}
                 {isAdmin() && <div className={styles.formField}>
                   <label className={styles.formLabel}>Price (₱)</label>
@@ -471,6 +487,10 @@ export default function InventoryPage() {
                 <div className={styles.formField}>
                   <label className={styles.formLabel}>Selling Price (₱)</label>
                   <input type="number" min="0" step="0.01" className={styles.formInput} value={editForm.sellingPrice} onChange={e => setEditForm(f=>({...f,sellingPrice:e.target.value}))} />
+                </div>
+                <div className={styles.formField} style={{ gridColumn:"1/-1" }}>
+                  <label className={styles.formLabel}>Notes</label>
+                  <textarea className={styles.formInput} rows={3} value={editForm.notes} onChange={e => setEditForm(f=>({...f,notes:e.target.value}))} style={{ resize:"vertical" }} />
                 </div>
                 <div className={styles.formField} style={{ gridColumn:"1/-1" }}>
                   <label className={styles.formLabel}>Item Photo</label>

@@ -127,6 +127,13 @@
   font-size: 13px; font-weight: 700;
   flex-shrink: 0;
 }
+.userAvatarImg {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid #c9a227;
+}
 .userDetails { display: flex; flex-direction: column; }
 .userName { font-size: 13px; font-weight: 700; color: #1a1a1a; line-height: 1.2; }
 .userRole  { font-size: 11px; color: #c9a227; font-weight: 600; line-height: 1.2; }

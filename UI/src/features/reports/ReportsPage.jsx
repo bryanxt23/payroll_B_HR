@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import styles from "./ReportsPage.module.css";
 import API from "../../config";
 import { isAdmin } from "../../utils/permissions";
-import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 const PAGE_SIZE = 15;
 
 const ACTION_COLORS = {
@@ -44,88 +45,219 @@ function parseSaleTarget(value) {
 
 const fmt = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-function makeSheet(rows, columns) {
-  return XLSX.utils.json_to_sheet(
-    rows.map(row =>
-      Object.fromEntries(columns.map(({ key, label }) => [label, row[key] ?? ""]))
-    )
-  );
+const GOLD  = [193, 148, 28];
+const LGOLD = [255, 248, 220];
+const GRAY  = [100, 100, 100];
+
+function pdfHeader(doc, title, dateFrom, dateTo) {
+  doc.setFillColor(...GOLD);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16); doc.setFont(undefined, "bold");
+  doc.text(title, 14, 14);
+  const dateRange = dateFrom || dateTo
+    ? `${dateFrom || "—"}  to  ${dateTo || "—"}`
+    : "All time";
+  doc.setFontSize(9); doc.setFont(undefined, "normal");
+  doc.text(dateRange, doc.internal.pageSize.getWidth() - 14, 14, { align: "right" });
+  doc.setTextColor(0, 0, 0);
+  return 28; // y cursor after header
 }
 
-function exportSalesExcel(sales) {
-  const wb = XLSX.utils.book_new();
+function sectionTitle(doc, text, y) {
+  doc.setFontSize(11); doc.setFont(undefined, "bold");
+  doc.setTextColor(...GRAY);
+  doc.text(text.toUpperCase(), 14, y);
+  doc.setTextColor(0, 0, 0);
+  return y + 5;
+}
 
-  // Sheet 1 — all transactions sorted highest to lowest
-  const sorted = [...sales].sort((a, b) => (b.totalPrice || 0) - (a.totalPrice || 0));
-  const txSheet = makeSheet(sorted, [
-    { key: "customerName",     label: "Customer Name" },
-    { key: "facebookName",     label: "Facebook Name" },
-    { key: "mobileNumber",     label: "Mobile Number" },
-    { key: "item",             label: "Item" },
-    { key: "totalPrice",       label: "Total Price" },
-    { key: "remainingBalance", label: "Remaining Balance" },
-    { key: "monthsToPay",      label: "Months to Pay" },
-    { key: "dueDate",          label: "Due Date" },
-    { key: "purchaseDate",     label: "Purchase Date" },
-    { key: "status",           label: "Status" },
-  ]);
-  XLSX.utils.book_append_sheet(wb, txSheet, "All Transactions");
+function exportSalesPDF(filteredSales, dateFrom, dateTo) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  let y = pdfHeader(doc, "Sales Report", dateFrom, dateTo);
 
-  // Sheet 2 — items ranked highest to lowest by total sales amount
-  const itemMap = {};
-  sales.forEach(l => {
-    const item = (l.item || "Unknown").trim();
-    if (!itemMap[item]) itemMap[item] = { totalSales: 0, transactions: 0 };
-    itemMap[item].totalSales   += (l.totalPrice || 0);
-    itemMap[item].transactions += 1;
+  // ── Summary stats ──────────────────────────────────────────────────
+  const total     = filteredSales.reduce((s, l) => s + (l.totalPrice || 0), 0);
+  const paid      = filteredSales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
+  const remaining = filteredSales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+
+  y = sectionTitle(doc, "Summary", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["Total Sales", "Transactions", "Paid", "Remaining"]],
+    body: [[
+      `P${total.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+      filteredSales.length,
+      `P${paid.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+      `P${remaining.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+    ]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    bodyStyles: { fillColor: LGOLD },
+    margin: { left: 14, right: 14 },
   });
-  const ranked = Object.entries(itemMap)
-    .sort((a, b) => b[1].totalSales - a[1].totalSales)
-    .map(([item, d], i) => ({
-      Rank: i + 1,
-      Item: item,
-      Transactions: d.transactions,
-      "Total Sales (₱)": d.totalSales,
-    }));
-  const rankSheet = XLSX.utils.json_to_sheet(ranked);
-  XLSX.utils.book_append_sheet(wb, rankSheet, "Items Ranking");
+  y = doc.lastAutoTable.finalY + 8;
 
-  XLSX.writeFile(wb, "sales_report.xlsx");
+  // ── Top Selling Items ──────────────────────────────────────────────
+  const itemMap = {};
+  filteredSales.forEach(l => {
+    const item = (l.item || "Unknown").trim();
+    if (!itemMap[item]) itemMap[item] = { count: 0, total: 0 };
+    itemMap[item].count += 1;
+    itemMap[item].total += (l.totalPrice || 0);
+  });
+  const topItems = Object.entries(itemMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([name, d], i) => [i + 1, name, d.count, `P${d.total.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`]);
+
+  y = sectionTitle(doc, "Top Selling Items", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Item", "Sales", "Total"]],
+    body: topItems.length ? topItems : [["", "No data", "", ""]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 20 }, 3: { cellWidth: 35 } },
+    margin: { left: 14, right: 14 },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // ── Top Buyers ─────────────────────────────────────────────────────
+  const buyerMap = {};
+  filteredSales.forEach(l => {
+    const buyer = (l.customerName || "Unknown").trim();
+    if (!buyerMap[buyer]) buyerMap[buyer] = { count: 0, total: 0 };
+    buyerMap[buyer].count += 1;
+    buyerMap[buyer].total += (l.totalPrice || 0);
+  });
+  const topBuyers = Object.entries(buyerMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([name, d], i) => [i + 1, name, d.count, `P${d.total.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`]);
+
+  y = sectionTitle(doc, "Top Buyers", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Buyer", "Orders", "Total"]],
+    body: topBuyers.length ? topBuyers : [["", "No data", "", ""]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 20 }, 3: { cellWidth: 35 } },
+    margin: { left: 14, right: 14 },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // ── All Transactions ───────────────────────────────────────────────
+  doc.addPage();
+  y = pdfHeader(doc, "Sales Report — All Transactions", dateFrom, dateTo);
+  y = sectionTitle(doc, "Transactions", y);
+  const txRows = [...filteredSales]
+    .sort((a, b) => (b.totalPrice || 0) - (a.totalPrice || 0))
+    .map(l => [
+      l.customerName || "—",
+      l.item || "—",
+      `P${(l.totalPrice || 0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+      `P${(l.remainingBalance || 0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+      l.purchaseDate || "—",
+      l.status || "—",
+    ]);
+  autoTable(doc, {
+    startY: y,
+    head: [["Customer", "Item", "Total", "Remaining", "Date", "Status"]],
+    body: txRows.length ? txRows : [["No data", "", "", "", "", ""]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    styles: { fontSize: 8 },
+    margin: { left: 14, right: 14 },
+  });
+
+  doc.save("sales_report.pdf");
 }
 
-function exportInventoryExcel(inventoryItems, adminView) {
-  const wb = XLSX.utils.book_new();
+function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  let y = pdfHeader(doc, "Inventory Report", dateFrom, dateTo);
 
-  // Sheet 1 — all items sorted highest to lowest quantity
-  const sorted = [...inventoryItems].sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
-  const cols = [
-    { key: "name",         label: "Item Name" },
-    { key: "category",     label: "Category" },
-    { key: "status",       label: "Status" },
-    { key: "quantity",     label: "Quantity" },
-    { key: "price",        label: "Cost Price" },
-    { key: "sellingPrice", label: "Selling Price" },
-    ...(adminView ? [{ key: "supplier", label: "Supplier" }] : []),
-  ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(sorted, cols), "All Items");
+  // ── Summary stats ──────────────────────────────────────────────────
+  const inStock  = filteredItems.filter(i => i.status === "In Stock").length;
+  const lowStock = filteredItems.filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock").length;
+  const value    = filteredItems.reduce((s, i) => s + (i.sellingPrice || i.price || 0) * (i.quantity || 0), 0);
 
-  // Sheet 2 — items ranked highest to lowest by quantity
-  const ranked = [...inventoryItems]
+  y = sectionTitle(doc, "Summary", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["Total Products", "In Stock", "Low / Out of Stock", "Inventory Value"]],
+    body: [[
+      filteredItems.length,
+      inStock,
+      lowStock,
+      `P${value.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+    ]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    bodyStyles: { fillColor: LGOLD },
+    margin: { left: 14, right: 14 },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // ── Low Stock Items ────────────────────────────────────────────────
+  const lowItems = filteredItems
+    .filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock")
+    .sort((a, b) => (a.quantity || 0) - (b.quantity || 0))
+    .map(i => [i.name || "—", i.quantity ?? 0, i.status || "—"]);
+
+  y = sectionTitle(doc, "Low Stock Items", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["Item", "Qty", "Status"]],
+    body: lowItems.length ? lowItems : [["No low stock items", "", ""]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    margin: { left: 14, right: 14 },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // ── Top Suppliers (admin only) ─────────────────────────────────────
+  if (adminView) {
+    const stats = {};
+    filteredItems.forEach(item => {
+      const s = (item.supplier || "Unknown").trim();
+      if (!stats[s]) stats[s] = { count: 0, quantity: 0 };
+      stats[s].count    += 1;
+      stats[s].quantity += (item.quantity || 0);
+    });
+    const suppliers = Object.entries(stats)
+      .sort((a, b) => b[1].quantity - a[1].quantity)
+      .map(([s, d], i) => [i + 1, s, d.count, d.quantity]);
+
+    y = sectionTitle(doc, "Top Suppliers", y);
+    autoTable(doc, {
+      startY: y,
+      head: [["#", "Supplier", "Items", "Qty"]],
+      body: suppliers.length ? suppliers : [["", "No suppliers", "", ""]],
+      headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 10 } },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  // ── All Items ──────────────────────────────────────────────────────
+  doc.addPage();
+  y = pdfHeader(doc, "Inventory Report — All Items", dateFrom, dateTo);
+  y = sectionTitle(doc, "All Items", y);
+  const cols = adminView
+    ? ["Item", "Category", "Qty", "Cost", "Selling Price", "Supplier", "Status"]
+    : ["Item", "Category", "Qty", "Cost", "Selling Price", "Status"];
+  const allRows = [...filteredItems]
     .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
-    .map((item, i) => ({
-      Rank: i + 1,
-      "Item Name": item.name || "",
-      Category: item.category || "",
-      Status: item.status || "",
-      Quantity: item.quantity ?? 0,
-      "Selling Price (₱)": item.sellingPrice || item.price || 0,
-      "Stock Value (₱)": (item.sellingPrice || item.price || 0) * (item.quantity || 0),
-      ...(adminView ? { Supplier: item.supplier || "" } : {}),
-    }));
-  const rankSheet = XLSX.utils.json_to_sheet(ranked);
-  XLSX.utils.book_append_sheet(wb, rankSheet, "Stock Ranking");
+    .map(i => adminView
+      ? [i.name||"—", i.category||"—", i.quantity??0, `P${(i.price||0).toLocaleString()}`, `P${(i.sellingPrice||0).toLocaleString()}`, i.supplier||"—", i.status||"—"]
+      : [i.name||"—", i.category||"—", i.quantity??0, `P${(i.price||0).toLocaleString()}`, `P${(i.sellingPrice||0).toLocaleString()}`, i.status||"—"]
+    );
+  autoTable(doc, {
+    startY: y,
+    head: [cols],
+    body: allRows.length ? allRows : [Array(cols.length).fill("")],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
+    styles: { fontSize: 8 },
+    margin: { left: 14, right: 14 },
+  });
 
-  XLSX.writeFile(wb, "inventory_report.xlsx");
+  doc.save("inventory_report.pdf");
 }
 
 function StatCard({ icon, label, value, accent }) {
@@ -168,17 +300,55 @@ export default function ReportsPage() {
     return Array.from(set).sort();
   }, [rawLogs]);
 
+  // ── Parse "MMM d, yyyy" purchaseDate reliably ─────────────────────
+  const parsePurchaseDate = str => {
+    if (!str) return null;
+    const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+    const m = str.match(/^(\w{3})\s+(\d{1,2}),\s+(\d{4})$/);
+    if (m && MONTHS[m[1]] !== undefined)
+      return new Date(parseInt(m[3]), MONTHS[m[1]], parseInt(m[2]));
+    const fallback = new Date(str);
+    return isNaN(fallback) ? null : fallback;
+  };
+
+  // ── Date-filtered slices used for summary stats ────────────────────
+  const filteredSales = useMemo(() => {
+    if (!dateFrom && !dateTo) return sales;
+    const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
+    const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;
+    return sales.filter(l => {
+      const d = parsePurchaseDate(l.purchaseDate);
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    });
+  }, [sales, dateFrom, dateTo]);
+
+  const filteredInventoryItems = useMemo(() => {
+    if (!dateFrom && !dateTo) return inventoryItems;
+    const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
+    const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;
+    return inventoryItems.filter(i => {
+      if (!i.createdAt) return false;
+      const d = new Date(i.createdAt);
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    });
+  }, [inventoryItems, dateFrom, dateTo]);
+
   // ── Sales summary stats ────────────────────────────────────────────
   const salesStats = useMemo(() => {
-    const total     = sales.reduce((s, l) => s + (l.totalPrice || 0), 0);
-    const paid      = sales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
-    const remaining = sales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
-    return { total, count: sales.length, paid, remaining };
-  }, [sales]);
+    const total     = filteredSales.reduce((s, l) => s + (l.totalPrice || 0), 0);
+    const paid      = filteredSales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
+    const remaining = filteredSales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+    return { total, count: filteredSales.length, paid, remaining };
+  }, [filteredSales]);
 
   const topSalesItems = useMemo(() => {
     const map = {};
-    sales.forEach(l => {
+    filteredSales.forEach(l => {
       const item = (l.item || "Unknown").trim();
       if (!map[item]) map[item] = { count: 0, total: 0 };
       map[item].count += 1;
@@ -188,11 +358,11 @@ export default function ReportsPage() {
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
       .map(([name, data]) => ({ name, count: data.count, total: data.total }));
-  }, [sales]);
+  }, [filteredSales]);
 
   const topSalesBuyers = useMemo(() => {
     const map = {};
-    sales.forEach(l => {
+    filteredSales.forEach(l => {
       const buyer = (l.customerName || "Unknown").trim();
       if (!map[buyer]) map[buyer] = { count: 0, total: 0 };
       map[buyer].count += 1;
@@ -202,27 +372,27 @@ export default function ReportsPage() {
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
       .map(([name, data]) => ({ name, count: data.count, total: data.total }));
-  }, [sales]);
+  }, [filteredSales]);
 
   // ── Inventory summary stats ────────────────────────────────────────
   const invStats = useMemo(() => {
-    const total    = inventoryItems.length;
-    const inStock  = inventoryItems.filter(i => i.status === "In Stock").length;
-    const lowStock = inventoryItems.filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock").length;
-    const value    = inventoryItems.reduce((s, i) => s + (i.sellingPrice || i.price || 0) * (i.quantity || 0), 0);
+    const total    = filteredInventoryItems.length;
+    const inStock  = filteredInventoryItems.filter(i => i.status === "In Stock").length;
+    const lowStock = filteredInventoryItems.filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock").length;
+    const value    = filteredInventoryItems.reduce((s, i) => s + (i.sellingPrice || i.price || 0) * (i.quantity || 0), 0);
     return { total, inStock, lowStock, value };
-  }, [inventoryItems]);
+  }, [filteredInventoryItems]);
 
   const lowStockItems = useMemo(() => {
-    return inventoryItems
+    return filteredInventoryItems
       .filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock")
       .sort((a, b) => (a.quantity || 0) - (b.quantity || 0))
       .slice(0, 5);
-  }, [inventoryItems]);
+  }, [filteredInventoryItems]);
 
   const topSuppliers = useMemo(() => {
     const stats = {};
-    inventoryItems.forEach(item => {
+    filteredInventoryItems.forEach(item => {
       const supplier = (item.supplier || "Unknown Supplier").trim() || "Unknown Supplier";
       const qty = Number(item.quantity || 0);
       if (!stats[supplier]) stats[supplier] = { count: 0, quantity: 0 };
@@ -233,7 +403,7 @@ export default function ReportsPage() {
       .map(([supplier, data]) => ({ supplier, count: data.count, quantity: data.quantity }))
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
-  }, [inventoryItems]);
+  }, [filteredInventoryItems]);
 
   // ── Activity log filtering ─────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -296,13 +466,13 @@ export default function ReportsPage() {
                 className={styles.exportBtn}
                 onClick={() => {
                   if (activeTab === "Sales") {
-                    exportSalesExcel(sales);
+                    exportSalesPDF(filteredSales, dateFrom, dateTo);
                   } else {
-                    exportInventoryExcel(inventoryItems, isAdmin());
+                    exportInventoryPDF(filteredInventoryItems, isAdmin(), dateFrom, dateTo);
                   }
                 }}
               >
-                ⬇ Export Excel
+                ⬇ Export PDF
               </button>
             </div>
           </div>
