@@ -610,6 +610,12 @@
 }
 .input:focus { border-color: rgba(201,162,39,.5); }
 
+.inputReadonly {
+  background: rgba(0,0,0,.04);
+  color: rgba(0,0,0,.50);
+  cursor: default;
+}
+
 .textarea {
   padding: 9px 12px;
   border-radius: 12px;
@@ -661,6 +667,51 @@
   font-weight: 650;
   color: rgba(0,0,0,.60);
 }
+
+/* ── Time picker dropdowns ── */
+.timePickerRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeSelect {
+  flex: 1;
+  padding: 9px 6px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.9);
+  font-size: 13px;
+  color: rgba(0,0,0,.75);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  text-align: center;
+}
+.timeSelect:focus { border-color: rgba(201,162,39,.5); }
+.timeSelect:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.timeColon {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(0,0,0,.35);
+}
+
+.timeAmpm {
+  width: 52px;
+  padding: 9px 4px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.9);
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0,0,0,.75);
+  cursor: pointer;
+  outline: none;
+  text-align: center;
+}
+.timeAmpm:focus { border-color: rgba(201,162,39,.5); }
+.timeAmpm:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .rangeHint {
   font-size: 11px;

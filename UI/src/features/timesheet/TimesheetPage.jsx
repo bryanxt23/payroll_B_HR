@@ -53,6 +53,51 @@ function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+// ── Friendly time picker (Hour / Minute / AM-PM dropdowns) ──
+function TimePicker({ value, onChange, label }) {
+  let hr12 = "", min = "", ampm = "AM";
+  if (value) {
+    const [h, m] = value.split(":").map(Number);
+    ampm = h >= 12 ? "PM" : "AM";
+    hr12 = String(h % 12 || 12);
+    min = String(m).padStart(2, "0");
+  }
+
+  function update(newHr, newMin, newAmpm) {
+    const h = newHr === "" ? "" : newHr;
+    const m = newMin === "" ? "00" : newMin;
+    const ap = newAmpm || ampm;
+    if (h === "") { onChange(""); return; }
+    let h24 = parseInt(h, 10);
+    if (ap === "PM" && h24 !== 12) h24 += 12;
+    if (ap === "AM" && h24 === 12) h24 = 0;
+    onChange(`${String(h24).padStart(2, "0")}:${m}`);
+  }
+
+  const hours = ["","1","2","3","4","5","6","7","8","9","10","11","12"];
+  const minutes = ["00","05","10","15","20","25","30","35","40","45","50","55"];
+
+  return (
+    <div className={styles.field}>
+      <label className={styles.label}>{label}</label>
+      <div className={styles.timePickerRow}>
+        <select className={styles.timeSelect} value={hr12} onChange={e => update(e.target.value, min, ampm)}>
+          <option value="">--</option>
+          {hours.filter(Boolean).map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+        <span className={styles.timeColon}>:</span>
+        <select className={styles.timeSelect} value={min} onChange={e => update(hr12, e.target.value, ampm)} disabled={!hr12}>
+          {minutes.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select className={styles.timeAmpm} value={ampm} onChange={e => update(hr12, min, e.target.value)} disabled={!hr12}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function statusColor(s) {
   if (!s) return "rgba(0,0,0,.15)";
   const l = s.toLowerCase();
@@ -109,7 +154,47 @@ function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
     }
   }, [entry]);
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+  function set(k, v) {
+    setForm(f => {
+      const next = { ...f, [k]: v };
+      // Auto-compute whenever time fields change
+      return recompute(next);
+    });
+  }
+
+  function toMin(t) {
+    if (!t) return null;
+    const [h, m] = t.split(":").map(Number);
+    return isNaN(h) ? null : h * 60 + (m || 0);
+  }
+
+  function recompute(f) {
+    const schedIn = toMin(f.schedStart);
+    const schedOut = toMin(f.schedEnd);
+    const tin = toMin(f.timeIn);
+    const tout = toMin(f.timeOut);
+    const brk = Number(f.breakMinutes) || 0;
+
+    // Late = how many minutes after scheduled start
+    let late = 0;
+    if (schedIn !== null && tin !== null && tin > schedIn) late = tin - schedIn;
+    f.lateMinutes = late;
+
+    // Worked hours & overtime & undertime
+    if (tin !== null && tout !== null && tout > tin) {
+      const totalMin = tout - tin - brk;
+      const worked = Math.max(0, totalMin / 60);
+      const schedHours = (schedIn !== null && schedOut !== null) ? (schedOut - schedIn - brk) / 60 : 8;
+      f.workedHours = Math.round(worked * 10) / 10;
+      f.overtimeHours = worked > schedHours ? Math.round((worked - schedHours) * 10) / 10 : 0;
+      f.undertimeMinutes = worked < schedHours ? Math.round((schedHours - worked) * 60) : 0;
+    } else {
+      f.workedHours = 0;
+      f.overtimeHours = 0;
+      f.undertimeMinutes = 0;
+    }
+    return f;
+  }
 
   async function save() {
     if (!form.date) { setError("Start date is required."); return; }
@@ -249,25 +334,13 @@ function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
           )}
 
           <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              <label className={styles.label}>Scheduled Start</label>
-              <input className={styles.input} type="time" value={form.schedStart} onChange={e => set("schedStart", e.target.value)} />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Scheduled End</label>
-              <input className={styles.input} type="time" value={form.schedEnd} onChange={e => set("schedEnd", e.target.value)} />
-            </div>
+            <TimePicker label="Scheduled Start" value={form.schedStart} onChange={v => set("schedStart", v)} />
+            <TimePicker label="Scheduled End" value={form.schedEnd} onChange={v => set("schedEnd", v)} />
           </div>
 
           <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              <label className={styles.label}>Time In</label>
-              <input className={styles.input} type="time" value={form.timeIn} onChange={e => set("timeIn", e.target.value)} />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Time Out</label>
-              <input className={styles.input} type="time" value={form.timeOut} onChange={e => set("timeOut", e.target.value)} />
-            </div>
+            <TimePicker label="Time In" value={form.timeIn} onChange={v => set("timeIn", v)} />
+            <TimePicker label="Time Out" value={form.timeOut} onChange={v => set("timeOut", v)} />
           </div>
 
           <div className={styles.fieldRow}>
@@ -277,25 +350,25 @@ function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Worked Hours</label>
-              <input className={styles.input} type="number" step="0.1" value={form.workedHours} onChange={e => set("workedHours", e.target.value)} />
+              <input className={`${styles.input} ${styles.inputReadonly}`} type="text" value={form.workedHours} readOnly />
             </div>
           </div>
 
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <label className={styles.label}>Late (mins)</label>
-              <input className={styles.input} type="number" value={form.lateMinutes} onChange={e => set("lateMinutes", e.target.value)} />
+              <input className={`${styles.input} ${styles.inputReadonly}`} type="text" value={form.lateMinutes} readOnly />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Undertime (mins)</label>
-              <input className={styles.input} type="number" value={form.undertimeMinutes} onChange={e => set("undertimeMinutes", e.target.value)} />
+              <input className={`${styles.input} ${styles.inputReadonly}`} type="text" value={form.undertimeMinutes} readOnly />
             </div>
           </div>
 
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <label className={styles.label}>Overtime (hrs)</label>
-              <input className={styles.input} type="number" step="0.1" value={form.overtimeHours} onChange={e => set("overtimeHours", e.target.value)} />
+              <input className={`${styles.input} ${styles.inputReadonly}`} type="text" value={form.overtimeHours} readOnly />
             </div>
             <div className={styles.field} />
           </div>

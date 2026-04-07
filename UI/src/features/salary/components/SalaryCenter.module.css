@@ -100,13 +100,13 @@
 .barFill{
   height:100%;
   border-radius: 999px;
-  width: 42%;
   background: rgba(0,0,0,.20);
+  transition: width .3s ease;
 }
 
-.fillYellow{ background: var(--yellow); width: 72%; }
-.fillDark{ background: rgba(255,255,255,.18); width: 42%; }
-.fillGrey{ background: rgba(0,0,0,.22); width: 58%; }
+.fillYellow{ background: var(--yellow); }
+.fillDark{ background: rgba(255,255,255,.18); }
+.fillGrey{ background: rgba(0,0,0,.22); }
 
 .barText{
   position:absolute;

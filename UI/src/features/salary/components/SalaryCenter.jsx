@@ -11,6 +11,7 @@ export default function SalaryCenter({
   onMonthChange,
   onYearChange,
   selectedEmployee,
+  timesheetSummary = { worked: 0, overtime: 0, leave: 0 },
 }) {
   const salary = selectedEmployee?.salary != null
     ? `$${Number(selectedEmployee.salary).toLocaleString()}`
@@ -58,24 +59,24 @@ export default function SalaryCenter({
         <div className={styles.barCard}>
           <div className={styles.barLabel}>Worked</div>
           <div className={`${styles.barPill} ${styles.yellowPill}`}>
-            <div className={`${styles.barFill} ${styles.fillYellow}`} />
-            <div className={styles.barText}>167 hrs</div>
+            <div className={`${styles.barFill} ${styles.fillYellow}`} style={{ width: `${Math.min(100, (timesheetSummary.worked / 200) * 100)}%` }} />
+            <div className={styles.barText}>{timesheetSummary.worked} hrs</div>
           </div>
         </div>
 
         <div className={styles.barCard}>
           <div className={styles.barLabel}>Overtime</div>
           <div className={`${styles.barPill} ${styles.darkPill}`}>
-            <div className={`${styles.barFill} ${styles.fillDark}`} />
-            <div className={`${styles.barText} ${styles.barTextWhite}`}>43 hrs</div>
+            <div className={`${styles.barFill} ${styles.fillDark}`} style={{ width: `${Math.min(100, (timesheetSummary.overtime / 50) * 100)}%` }} />
+            <div className={`${styles.barText} ${styles.barTextWhite}`}>{timesheetSummary.overtime} hrs</div>
           </div>
         </div>
 
         <div className={styles.barCard}>
           <div className={styles.barLabel}>Leave</div>
           <div className={styles.barPill}>
-            <div className={`${styles.barFill} ${styles.fillGrey}`} />
-            <div className={styles.barText}>74 hrs</div>
+            <div className={`${styles.barFill} ${styles.fillGrey}`} style={{ width: `${Math.min(100, (timesheetSummary.leave / 80) * 100)}%` }} />
+            <div className={styles.barText}>{timesheetSummary.leave} hrs</div>
           </div>
         </div>
       </div>

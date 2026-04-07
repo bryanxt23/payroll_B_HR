@@ -60,6 +60,7 @@ export default function SalaryPage() {
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
   const [calendarDays, setCalendarDays] = useState([]);
+  const [timesheetSummary, setTimesheetSummary] = useState({ worked: 0, overtime: 0, leave: 0 });
 
   const [debouncedSelectedCode, setDebouncedSelectedCode] = useState(null);
 
@@ -160,12 +161,27 @@ export default function SalaryPage() {
 
     const empCalUrl = `${API_BASE}/api/employees/${selectedCode}/calendar?year=${selectedYear}&month=${Number(selectedMonth) + 1}`;
     const eventsUrl = `${API_BASE}/api/calendar/events?year=${selectedYear}&month=${Number(selectedMonth) + 1}&employeeCode=${selectedCode}`;
+    const tsUrl = `${API_BASE}/api/timesheets?employeeCode=${selectedCode}&year=${selectedYear}&month=${Number(selectedMonth) + 1}`;
 
     Promise.all([
       fetch(empCalUrl).then(r => r.ok ? r.json() : []),
       fetch(eventsUrl).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(tsUrl).then(r => r.ok ? r.json() : []).catch(() => []),
     ])
-    .then(([empData, globalEvents]) => {
+    .then(([empData, globalEvents, tsData]) => {
+      // Compute timesheet summary
+      const tsList = Array.isArray(tsData) ? tsData : [];
+      let worked = 0, overtime = 0, leaveHrs = 0;
+      for (const ts of tsList) {
+        worked += ts.workedHours || 0;
+        overtime += ts.overtimeHours || 0;
+        if (ts.status === "Leave") leaveHrs += 8; // count each leave day as 8 hrs
+      }
+      setTimesheetSummary({
+        worked: Math.round(worked * 10) / 10,
+        overtime: Math.round(overtime * 10) / 10,
+        leave: Math.round(leaveHrs * 10) / 10,
+      });
       const empDays = Array.isArray(empData) ? empData : [];
 
       // Merge global calendar events into employee calendar days
@@ -244,6 +260,7 @@ export default function SalaryPage() {
         onMonthChange={setSelectedMonth}
         onYearChange={setSelectedYear}
         selectedEmployee={profile}
+        timesheetSummary={timesheetSummary}
       />
 
       <ProfilePanel profile={profile} />
