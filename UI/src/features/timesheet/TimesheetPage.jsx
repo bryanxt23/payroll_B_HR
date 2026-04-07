@@ -77,19 +77,22 @@ function statusBg(s) {
 function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
   const isEdit = !!entry;
   const [form, setForm] = useState({
-    date: "", schedStart: "08:00", schedEnd: "17:00",
+    date: "", endDate: "", schedStart: "08:00", schedEnd: "17:00",
     timeIn: "", timeOut: "", breakMinutes: 60,
     workedHours: 0, lateMinutes: 0, undertimeMinutes: 0,
     overtimeHours: 0, status: "Present", remarks: "",
   });
+  const [useRange, setUseRange] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState("");
   const overlayRef = useRef(null);
 
   useEffect(() => {
     if (entry) {
       setForm({
         date: entry.date || "",
+        endDate: "",
         schedStart: entry.schedStart || "08:00",
         schedEnd: entry.schedEnd || "17:00",
         timeIn: entry.timeIn || "",
@@ -102,41 +105,87 @@ function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
         status: entry.status || "Present",
         remarks: entry.remarks || "",
       });
+      setUseRange(false);
     }
   }, [entry]);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
   async function save() {
-    if (!form.date) { setError("Date is required."); return; }
-    setSaving(true); setError("");
+    if (!form.date) { setError("Start date is required."); return; }
+    if (useRange && !isEdit && !form.endDate) { setError("End date is required for range."); return; }
+
+    setSaving(true); setError(""); setProgress("");
     try {
-      const body = {
-        employeeCode,
-        date: form.date,
-        schedStart: form.schedStart || null,
-        schedEnd: form.schedEnd || null,
-        timeIn: form.timeIn || null,
-        timeOut: form.timeOut || null,
-        breakMinutes: Number(form.breakMinutes) || 0,
-        workedHours: Number(form.workedHours) || 0,
-        lateMinutes: Number(form.lateMinutes) || 0,
-        undertimeMinutes: Number(form.undertimeMinutes) || 0,
-        overtimeHours: Number(form.overtimeHours) || 0,
-        status: form.status,
-        remarks: form.remarks.trim() || null,
-      };
-      const url = isEdit ? `${API_BASE}/api/timesheets/${entry.id}` : `${API_BASE}/api/timesheets`;
-      await fetch(url, {
-        method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      if (useRange && !isEdit) {
+        // Bulk create: one entry per weekday in range
+        const start = new Date(form.date + "T00:00:00");
+        const end = new Date(form.endDate + "T00:00:00");
+        if (end < start) { setError("End date must be after start date."); setSaving(false); return; }
+
+        const dates = [];
+        const cur = new Date(start);
+        while (cur <= end) {
+          const dow = cur.getDay();
+          if (dow !== 0) { // skip Sundays
+            dates.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`);
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+
+        for (let i = 0; i < dates.length; i++) {
+          setProgress(`Creating ${i + 1} of ${dates.length}...`);
+          const body = {
+            employeeCode,
+            date: dates[i],
+            schedStart: form.schedStart || null,
+            schedEnd: form.schedEnd || null,
+            timeIn: form.timeIn || null,
+            timeOut: form.timeOut || null,
+            breakMinutes: Number(form.breakMinutes) || 0,
+            workedHours: Number(form.workedHours) || 0,
+            lateMinutes: Number(form.lateMinutes) || 0,
+            undertimeMinutes: Number(form.undertimeMinutes) || 0,
+            overtimeHours: Number(form.overtimeHours) || 0,
+            status: form.status,
+            remarks: form.remarks.trim() || null,
+          };
+          await fetch(`${API_BASE}/api/timesheets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        }
+      } else {
+        // Single entry
+        const body = {
+          employeeCode,
+          date: form.date,
+          schedStart: form.schedStart || null,
+          schedEnd: form.schedEnd || null,
+          timeIn: form.timeIn || null,
+          timeOut: form.timeOut || null,
+          breakMinutes: Number(form.breakMinutes) || 0,
+          workedHours: Number(form.workedHours) || 0,
+          lateMinutes: Number(form.lateMinutes) || 0,
+          undertimeMinutes: Number(form.undertimeMinutes) || 0,
+          overtimeHours: Number(form.overtimeHours) || 0,
+          status: form.status,
+          remarks: form.remarks.trim() || null,
+        };
+        const url = isEdit ? `${API_BASE}/api/timesheets/${entry.id}` : `${API_BASE}/api/timesheets`;
+        await fetch(url, {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
       onSaved();
     } catch {
       setError("Failed to save.");
     } finally {
       setSaving(false);
+      setProgress("");
     }
   }
 
@@ -148,21 +197,56 @@ function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
           <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
         <div className={styles.modalBody}>
+          {/* Range toggle — only for new entries */}
+          {!isEdit && (
+            <label className={styles.rangeToggle} onClick={() => setUseRange(r => !r)}>
+              <div className={`${styles.toggleTrack} ${useRange ? styles.toggleOn : ""}`}>
+                <div className={styles.toggleThumb} />
+              </div>
+              <span className={styles.toggleText}>Date Range {useRange ? "(bulk create)" : ""}</span>
+            </label>
+          )}
+
           <div className={styles.fieldRow}>
             <div className={styles.field}>
-              <label className={styles.label}>Date *</label>
+              <label className={styles.label}>{useRange && !isEdit ? "Start Date *" : "Date *"}</label>
               <input className={styles.input} type="date" value={form.date} onChange={e => set("date", e.target.value)} />
             </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Status</label>
-              <select className={styles.input} value={form.status} onChange={e => set("status", e.target.value)}>
-                <option value="Present">Present</option>
-                <option value="Absent">Absent</option>
-                <option value="Leave">Leave</option>
-                <option value="Holiday">Holiday</option>
-              </select>
-            </div>
+            {useRange && !isEdit ? (
+              <div className={styles.field}>
+                <label className={styles.label}>End Date *</label>
+                <input className={styles.input} type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} />
+              </div>
+            ) : (
+              <div className={styles.field}>
+                <label className={styles.label}>Status</label>
+                <select className={styles.input} value={form.status} onChange={e => set("status", e.target.value)}>
+                  <option value="Present">Present</option>
+                  <option value="Absent">Absent</option>
+                  <option value="Leave">Leave</option>
+                  <option value="Holiday">Holiday</option>
+                </select>
+              </div>
+            )}
           </div>
+
+          {useRange && !isEdit && (
+            <div className={styles.fieldRow}>
+              <div className={styles.field}>
+                <label className={styles.label}>Status</label>
+                <select className={styles.input} value={form.status} onChange={e => set("status", e.target.value)}>
+                  <option value="Present">Present</option>
+                  <option value="Absent">Absent</option>
+                  <option value="Leave">Leave</option>
+                  <option value="Holiday">Holiday</option>
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>&nbsp;</label>
+                <div className={styles.rangeHint}>Sundays are automatically skipped</div>
+              </div>
+            </div>
+          )}
 
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -223,10 +307,11 @@ function TimesheetModal({ entry, employeeCode, onClose, onSaved }) {
         </div>
 
         {error && <div className={styles.modalError}>{error}</div>}
+        {progress && <div className={styles.modalProgress}>{progress}</div>}
         <div className={styles.modalFooter}>
           <button className={styles.cancelBtn} onClick={onClose} disabled={saving}>Cancel</button>
           <button className={styles.saveBtn} onClick={save} disabled={saving}>
-            {saving ? "Saving..." : isEdit ? "Save Changes" : "+ Add Timesheet"}
+            {saving ? (progress || "Saving...") : isEdit ? "Save Changes" : useRange ? "Create All" : "+ Add Timesheet"}
           </button>
         </div>
       </div>
@@ -330,10 +415,87 @@ export default function TimesheetPage() {
     ? employees.filter(e => (e.name || "").toLowerCase().includes(empSearch.toLowerCase()))
     : employees;
 
+  const todayEntry = entryMap[todayKey];
+  const canTimeIn = !todayEntry || !todayEntry.timeIn;
+  const canTimeOut = todayEntry && todayEntry.timeIn && !todayEntry.timeOut;
+
+  function nowTime() {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
+  }
+
+  async function handleTimeIn() {
+    if (!selectedCode) return;
+    const now = nowTime();
+    const body = {
+      employeeCode: selectedCode,
+      date: todayKey,
+      schedStart: "08:00", schedEnd: "17:00",
+      timeIn: now, timeOut: null,
+      breakMinutes: 60, workedHours: 0,
+      lateMinutes: 0, undertimeMinutes: 0, overtimeHours: 0,
+      status: "Present", remarks: null,
+    };
+    // Compute late
+    const [sh] = "08:00".split(":").map(Number);
+    const [nh, nm] = now.split(":").map(Number);
+    const diffMin = (nh * 60 + nm) - (sh * 60);
+    if (diffMin > 0) body.lateMinutes = diffMin;
+
+    await fetch(`${API_BASE}/api/timesheets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    reload();
+  }
+
+  async function handleTimeOut() {
+    if (!todayEntry?.id) return;
+    const now = nowTime();
+    const [ih, im] = (todayEntry.timeIn || "08:00").split(":").map(Number);
+    const [oh, om] = now.split(":").map(Number);
+    const totalMin = (oh * 60 + om) - (ih * 60 + im);
+    const breakMin = todayEntry.breakMinutes || 60;
+    const worked = Math.max(0, (totalMin - breakMin) / 60);
+    const schedHours = 8; // standard
+    const ot = Math.max(0, worked - schedHours);
+
+    await fetch(`${API_BASE}/api/timesheets/${todayEntry.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        timeOut: now,
+        workedHours: Math.round(worked * 10) / 10,
+        overtimeHours: Math.round(ot * 10) / 10,
+        undertimeMinutes: worked < schedHours ? Math.round((schedHours - worked) * 60) : 0,
+      }),
+    });
+    reload();
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Timesheet</h1>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.pageTitle}>Timesheet</h1>
+          <div className={styles.clockBtns}>
+            <button
+              className={`${styles.clockBtn} ${styles.clockIn}`}
+              disabled={!canTimeIn}
+              onClick={handleTimeIn}
+            >
+              Time In
+            </button>
+            <button
+              className={`${styles.clockBtn} ${styles.clockOut}`}
+              disabled={!canTimeOut}
+              onClick={handleTimeOut}
+            >
+              Time Out
+            </button>
+          </div>
+        </div>
         <button className={styles.addBtn} onClick={() => setModalEntry(null)}>+ Add Timesheet</button>
       </div>
 

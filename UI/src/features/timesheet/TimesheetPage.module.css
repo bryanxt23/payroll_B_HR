@@ -14,12 +14,49 @@
   margin-bottom: 14px;
 }
 
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .pageTitle {
   font-size: 26px;
   font-weight: 800;
   color: rgba(0,0,0,.80);
   margin: 0;
 }
+
+.clockBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.clockBtn {
+  padding: 8px 18px;
+  border-radius: 12px;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .12s, opacity .12s;
+}
+.clockBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.clockIn {
+  background: rgba(39,174,96,.15);
+  color: #1e8449;
+}
+.clockIn:hover:not(:disabled) { background: rgba(39,174,96,.25); }
+
+.clockOut {
+  background: rgba(192,57,43,.12);
+  color: #922b1e;
+}
+.clockOut:hover:not(:disabled) { background: rgba(192,57,43,.22); }
 
 .addBtn {
   padding: 10px 22px;
@@ -587,11 +624,63 @@
 }
 .textarea:focus { border-color: rgba(201,162,39,.5); }
 
+/* ── Range toggle ── */
+.rangeToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggleTrack {
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(0,0,0,.15);
+  position: relative;
+  transition: background .15s;
+}
+.toggleOn { background: #27ae60; }
+
+.toggleThumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: left .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}
+.toggleOn .toggleThumb { left: 18px; }
+
+.toggleText {
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(0,0,0,.60);
+}
+
+.rangeHint {
+  font-size: 11px;
+  color: rgba(0,0,0,.35);
+  font-style: italic;
+  padding: 10px 0;
+}
+
 .modalError {
   padding: 8px 22px;
   font-size: 12px;
   font-weight: 600;
   color: #c0392b;
+}
+
+.modalProgress {
+  padding: 4px 22px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2980b9;
 }
 
 .modalFooter {
