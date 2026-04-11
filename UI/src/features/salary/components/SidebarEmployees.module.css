@@ -76,10 +76,6 @@
   cursor:pointer;
 }
 
-@media (max-width: 860px){
-  .left{ display:none; }
-}
-
 .emp {
   cursor: pointer;
   transition: all 0.2s ease;

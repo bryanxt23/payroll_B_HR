@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import styles from "./SalesPage.module.css";
-import { canAddSales, canDeleteSales, canPaySales, isAdmin } from "../../utils/permissions";
+import { canAddSales, canEditSales, canDeleteSales, canPaySales, isAdmin } from "../../utils/permissions";
 import API_BASE from "../../config";
 
 const PAGE_SIZE = 5;
 const TABS = ["All", "Active", "Paid"];
-const EMPTY_FORM = { customerName: "", facebookName: "", mobileNumber: "", item: "", quantity: "1", paymentTerms: "Cash", discount: "0", downPayment: "", monthsToPay: "1", dueDate: "" };
+const TEAM_OPTIONS = ["Team A", "Team B", "Team C", "Team D", "Team E"];
+const EMPTY_FORM = { customerName: "", facebookName: "", mobileNumber: "", item: "", quantity: "1", paymentTerms: "Cash", discount: "0", downPayment: "", monthsToPay: "1", dueDate: "", team: "Team A" };
 
 
 function buildPagerPages(page, totalPages) {
@@ -121,7 +122,7 @@ export default function SalesPage() {
   const [editForm, setEditForm]           = useState({});
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [apForm, setApForm]               = useState({ customerName: "", item: "", quantity: "1", paymentTerms: "Cash", discount: "0", downPayment: "", monthsToPay: "1", dueDate: "" });
+  const [apForm, setApForm]               = useState({ customerName: "", item: "", quantity: "1", paymentTerms: "Cash", discount: "0", downPayment: "", monthsToPay: "1", dueDate: "", team: "Team A" });
   const [showItemPicker, setShowItemPicker] = useState(false);   // which form: "add" | "addProduct" | "edit"
   const [itemPickerSearch, setItemPickerSearch] = useState("");
   const [itemPickerCategory, setItemPickerCategory] = useState("All");
@@ -443,6 +444,7 @@ export default function SalesPage() {
       profit:           parseFloat(perProfit.toFixed(2)),
       dueDate,
       status: "Active",
+      team:             form.team || "Team A",
     };
 
     // Fire one POST per unit in parallel
@@ -497,7 +499,7 @@ export default function SalesPage() {
 
   const closeAddProduct = () => {
     setShowAddProduct(false);
-    setApForm({ customerName: "", item: "", quantity: "1", paymentTerms: "Cash", discount: "0", downPayment: "", monthsToPay: "1", dueDate: "" });
+    setApForm({ customerName: "", item: "", quantity: "1", paymentTerms: "Cash", discount: "0", downPayment: "", monthsToPay: "1", dueDate: "", team: "Team A" });
   };
 
   const handleApSubmit = (e) => {
@@ -534,6 +536,7 @@ export default function SalesPage() {
       profit:           parseFloat(perProfit.toFixed(2)),
       dueDate,
       status: "Active",
+      team:             apForm.team || "Team A",
     };
 
     Promise.all(
@@ -569,6 +572,7 @@ export default function SalesPage() {
       profit:           String(loan.profit         ?? ""),
       dueDate:          loan.dueDate          || "",
       status:           loan.status           || "Active",
+      team:             loan.team             || "Team A",
     });
   };
 
@@ -790,7 +794,7 @@ export default function SalesPage() {
                     <div className={styles.colDue}>{loan.dueDate}</div>
                     <div className={styles.colAction}>
                       <button className={styles.infoBtn} onClick={() => setHistoryModal(loan)} title="View History">ℹ</button>
-                      {isAdmin()        && <button className={styles.editBtn}   onClick={() => openEdit(loan)}    title="Edit">✎</button>}
+                      {canEditSales()   && <button className={styles.editBtn}   onClick={() => openEdit(loan)}    title="Edit">✎</button>}
                       {canDeleteSales() && <button className={styles.deleteBtn} onClick={() => handleDelete(loan)} title="Delete">🗑</button>}
                       {isPaid ? (
                         <span className={styles.paidBadge}>✓ Paid</span>
@@ -1343,6 +1347,13 @@ export default function SalesPage() {
                     <option value="Paid">Paid</option>
                   </select>
                 </div>
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Team</label>
+                  <select className={styles.formInput} value={editForm.team || "Team A"}
+                    onChange={e => setEditForm(f => ({ ...f, team: e.target.value }))}>
+                    {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
               </div>
               <div className={styles.formActions}>
                 <button type="button" className={styles.cancelBtn} onClick={closeEdit}>Cancel</button>
@@ -1488,6 +1499,14 @@ export default function SalesPage() {
                     onChange={e => setApForm(f => ({ ...f, dueDate: e.target.value }))} />
                 </div>
 
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Team</label>
+                  <select className={styles.formInput} value={apForm.team || "Team A"}
+                    onChange={e => setApForm(f => ({ ...f, team: e.target.value }))}>
+                    {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
               </div>
               <div className={styles.formActions}>
                 <button type="button" className={styles.cancelBtn} onClick={closeAddProduct}>Cancel</button>
@@ -1618,6 +1637,15 @@ export default function SalesPage() {
                   <input type="date" className={styles.formInput}
                     value={form.dueDate || defaultDueDateInput()}
                     onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+                </div>
+
+                {/* Team */}
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Team</label>
+                  <select className={styles.formInput} value={form.team || "Team A"}
+                    onChange={e => setForm(f => ({ ...f, team: e.target.value }))}>
+                    {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
               </div>
               <div className={styles.formActions}>

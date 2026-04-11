@@ -59,7 +59,10 @@ public class SalesController {
         log.setActionType("Added");
         log.setTargetName(saved.getCustomerName() + " / " + saved.getItem());
         log.setDetails("Created sale, Total ₱" + fmtNum(saved.getTotalPrice())
-                + ", Monthly ₱" + fmtNum(saved.getMonthlyPayment()));
+                + ", Monthly ₱" + fmtNum(saved.getMonthlyPayment())
+                + ", Profit ₱" + fmtNum(saved.getProfit()));
+        log.setTeam(saved.getTeam());
+        log.setPaymentTerms(saved.getPaymentTerms());
         activityRepo.save(log);
 
         return saved;
@@ -115,6 +118,7 @@ public class SalesController {
         if (updated.getProfit()           != null) loan.setProfit(updated.getProfit());
         if (updated.getDueDate()          != null) loan.setDueDate(updated.getDueDate());
         if (updated.getStatus()           != null) loan.setStatus(updated.getStatus());
+        if (updated.getTeam()             != null) loan.setTeam(updated.getTeam());
 
         // Append edit entry to payment notes history
         {
@@ -138,6 +142,8 @@ public class SalesController {
         log.setActionType("Edited");
         log.setTargetName(saved.getCustomerName() + " / " + saved.getItem());
         log.setDetails(details);
+        log.setTeam(saved.getTeam());
+        log.setPaymentTerms(saved.getPaymentTerms());
         activityRepo.save(log);
 
         return saved;
@@ -205,6 +211,8 @@ public class SalesController {
         Payment payment = new Payment();
         payment.setStoreId(sid());
         payment.setAmount(amount);
+        payment.setTeam(saved.getTeam());
+        payment.setPaymentTerms(saved.getPaymentTerms());
         paymentRepo.save(payment);
 
         boolean fullPaid = newBalance <= 0;
@@ -230,6 +238,8 @@ public class SalesController {
                         invLog.setActionType("Stock Update");
                         invLog.setTargetName(invItem.getName());
                         invLog.setDetails("Qty reduced to " + newQty + (newQty == 0 ? " — Out of Stock" : ""));
+                        invLog.setTeam(saved.getTeam());
+                        invLog.setPaymentTerms(saved.getPaymentTerms());
                         activityRepo.save(invLog);
                     });
         }
@@ -247,6 +257,8 @@ public class SalesController {
         log.setDetails("Payment ₱" + fmtNum(amount)
                 + (fullPaid ? " — Fully Paid!" : ", Remaining ₱" + fmtNum(newBalance))
                 + (notes != null ? " | Note: " + notes : ""));
+        log.setTeam(saved.getTeam());
+        log.setPaymentTerms(saved.getPaymentTerms());
         activityRepo.save(log);
 
         return saved;
@@ -268,6 +280,8 @@ public class SalesController {
         log.setActionType("Deleted");
         log.setTargetName(loan.getCustomerName() + " / " + loan.getItem());
         log.setDetails("Removed sale record");
+        log.setTeam(loan.getTeam());
+        log.setPaymentTerms(loan.getPaymentTerms());
         activityRepo.save(log);
 
         repo.deleteById(id);

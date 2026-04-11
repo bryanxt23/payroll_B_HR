@@ -66,6 +66,8 @@ public class SalesLoan {
     @Column(name = "paid_this_month")
     private Double paidThisMonth;
 
+    private String team;
+
     public Long getId() { return id; }
 
     public Long getStoreId() { return storeId; }
@@ -127,4 +129,7 @@ public class SalesLoan {
 
     public Double getPaidThisMonth() { return paidThisMonth; }
     public void setPaidThisMonth(Double paidThisMonth) { this.paidThisMonth = paidThisMonth; }
+
+    public String getTeam() { return team; }
+    public void setTeam(String team) { this.team = team; }
 }

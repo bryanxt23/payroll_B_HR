@@ -38,7 +38,7 @@ const EVENT_DOT = {
   Other:           "#95a5a6",
 };
 
-// -- Friendly time picker (Hour / Minute / AM-PM dropdowns) --
+// ── Friendly time picker (Hour / Minute / AM-PM dropdowns) ──
 function TimePicker({ value, onChange, label }) {
   // value is "HH:mm" (24h) or ""
   let hr12 = "", min = "", ampm = "AM";
@@ -171,7 +171,7 @@ function parseDate(d) {
   return d;
 }
 
-// -- Event Modal --
+// ── Event Modal ──
 function EventModal({ event, onClose, onSaved, allEmployees }) {
   const [form, setForm] = useState({
     title: "", startDate: "", endDate: "", startTime: "", endTime: "",
@@ -273,7 +273,7 @@ function EventModal({ event, onClose, onSaved, allEmployees }) {
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
           <div className={styles.modalTitle}>{isEdit ? "Edit Event" : "Add Event"}</div>
-          <button className={styles.modalClose} onClick={onClose}>?</button>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
 
         <div className={styles.modalBody}>
@@ -314,7 +314,7 @@ function EventModal({ event, onClose, onSaved, allEmployees }) {
             <textarea className={styles.textarea} value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Add notes..." />
           </div>
 
-          {/* Attendees � hidden for Leave & Overtime (personal events, just the creator) */}
+          {/* Attendees — hidden for Leave & Overtime (personal events, just the creator) */}
           {!["Leave", "Holiday", "Overtime"].includes(form.eventType) && (
             <div className={styles.field}>
               <label className={styles.label}>Attendees</label>
@@ -327,7 +327,7 @@ function EventModal({ event, onClose, onSaved, allEmployees }) {
                     ? <span className={styles.attendeePlaceholder}>Select employees...</span>
                     : <span className={styles.attendeeCount}>{form.attendees.length} selected</span>
                   }
-                  <span className={styles.attendeeChevron}>{empOpen ? "?" : "?"}</span>
+                  <span className={styles.attendeeChevron}>{empOpen ? "▴" : "▾"}</span>
                 </div>
                 {empOpen && (
                   <div className={styles.attendeeDropdownList}>
@@ -370,7 +370,7 @@ function EventModal({ event, onClose, onSaved, allEmployees }) {
                     return (
                       <span key={code} className={styles.attendeeTag}>
                         {emp?.name || code}
-                        <button className={styles.attendeeTagRemove} onClick={() => removeAttendee(code)}>?</button>
+                        <button className={styles.attendeeTagRemove} onClick={() => removeAttendee(code)}>✕</button>
                       </span>
                     );
                   })}
@@ -398,7 +398,7 @@ function getUser() {
   catch { return null; }
 }
 
-// -- Main CalendarPage --
+// ── Main CalendarPage ──
 export default function CalendarPage() {
   const user = getUser();
   const today = new Date();
@@ -675,12 +675,12 @@ export default function CalendarPage() {
         {/* Right panel */}
         <div className={styles.rightPanel}>
           {selectedDay && !selectedEvent ? (
-            /* -- Day summary (from "+N more" click) -- */
+            /* ── Day summary (from "+N more" click) ── */
             <>
               <div className={styles.detailPanel}>
                 <div className={styles.detailHeader}>
                   <div className={styles.detailHeaderTitle}>Event Details</div>
-                  <button className={styles.detailClose} onClick={() => setSelectedDay(null)}>?</button>
+                  <button className={styles.detailClose} onClick={() => setSelectedDay(null)}>✕</button>
                 </div>
                 <div className={styles.detailBody}>
                   <div className={styles.daySummaryDate}>{formatDate(selectedDay.date)}</div>
@@ -712,30 +712,30 @@ export default function CalendarPage() {
               </div>
             </>
           ) : selectedEvent ? (
-            /* -- Single event detail -- */
+            /* ── Single event detail ── */
             <>
               <div className={styles.detailPanel}>
                 <div className={styles.detailHeader}>
                   <div className={styles.detailHeaderTitle}>Event Details</div>
-                  <button className={styles.detailClose} onClick={() => { setSelectedEvent(null); setSelectedDay(null); }}>?</button>
+                  <button className={styles.detailClose} onClick={() => { setSelectedEvent(null); setSelectedDay(null); }}>✕</button>
                 </div>
 
                 <div className={styles.detailBody}>
                   {/* Back to day list if came from "+more" */}
                   {selectedDay && (
                     <button className={styles.backToDay} onClick={() => setSelectedEvent(null)}>
-                      ? Back to day
+                      ← Back to day
                     </button>
                   )}
 
                   <div className={styles.detailEventRow}>
-                    <div className={styles.detailEventIcon}>??</div>
+                    <div className={styles.detailEventIcon}>📅</div>
                     <div>
                       <div className={styles.detailEventTitle}>{selectedEvent.title}</div>
                       <div className={styles.detailEventDate}>
                         {formatDate(parseDate(selectedEvent.startDate))}
                         {selectedEvent.endDate && parseDate(selectedEvent.endDate) !== parseDate(selectedEvent.startDate)
-                          ? ` � ${formatDate(parseDate(selectedEvent.endDate))}`
+                          ? ` — ${formatDate(parseDate(selectedEvent.endDate))}`
                           : ""}
                       </div>
                       {(selectedEvent.startTime || selectedEvent.endTime) && (
@@ -756,7 +756,7 @@ export default function CalendarPage() {
                   {attendeeDetails.length > 0 && (
                     <>
                       <div className={styles.detailSection}>
-                        <span className={styles.detailSectionIcon}>??</span> Attendees
+                        <span className={styles.detailSectionIcon}>👥</span> Attendees
                       </div>
                       <div className={styles.attendeeList}>
                         {attendeeDetails.map(a => (
@@ -777,7 +777,7 @@ export default function CalendarPage() {
                   {selectedEvent.notes && (
                     <>
                       <div className={styles.detailSection}>
-                        <span className={styles.detailSectionIcon}>??</span> Notes
+                        <span className={styles.detailSectionIcon}>📝</span> Notes
                       </div>
                       <div className={styles.detailNotes}>{selectedEvent.notes}</div>
                     </>
@@ -802,10 +802,10 @@ export default function CalendarPage() {
               </div>
             </>
           ) : (
-            /* -- Empty state -- */
+            /* ── Empty state ── */
             <>
               <div className={styles.panelEmpty}>
-                <div className={styles.panelEmptyIcon}>??</div>
+                <div className={styles.panelEmptyIcon}>💡</div>
                 <div className={styles.panelEmptyTitle}>No Event Selected</div>
                 <div className={styles.panelEmptyText}>
                   Click on an event in the calendar<br />to see its details.

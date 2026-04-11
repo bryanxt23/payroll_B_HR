@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import API_BASE from "../../config";
 import styles from "./PeoplePage.module.css";
+import { getStores } from "../../utils/stores";
 
 const PAGE_SIZE = 5;
 const AVATAR_COLORS = ["#5a4e3a","#3a4e4a","#4a3a5a","#4e4a3a","#3a4a5a","#5a3a3a","#3a5a3a"];
@@ -27,7 +28,7 @@ function StatusBadge({ status }) {
 }
 
 const EMPTY_FORM = {
-  name: "", role: "", department: "", salary: "", status: "Active",
+  name: "", role: "", storeName: "", department: "", salary: "", status: "Active",
   birthday: "", phone: "", email: "", citizenship: "", city: "", address: "",
 };
 
@@ -38,6 +39,7 @@ const DOC_TYPES = [
 ];
 
 function EmployeeModal({ emp, onClose, onSaved }) {
+  const storeOptions            = useMemo(() => getStores(), []);
   const [form, setForm]         = useState(EMPTY_FORM);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
@@ -56,6 +58,7 @@ function EmployeeModal({ emp, onClose, onSaved }) {
     const base = {
       name:        emp.name        || "",
       role:        emp.role        || "",
+      storeName:   emp.storeName   || "",
       department:  emp.department  || "",
       salary:      emp.salary != null ? String(emp.salary) : "",
       status:      emp.status      || "Active",
@@ -122,6 +125,7 @@ function EmployeeModal({ emp, onClose, onSaved }) {
       const empBody = {
         name:       form.name.trim(),
         role:       form.role.trim(),
+        storeName:  form.storeName.trim(),
         department: form.department.trim(),
         salary:     form.salary !== "" ? Number(form.salary) : null,
         status:     form.status,
@@ -224,6 +228,15 @@ function EmployeeModal({ emp, onClose, onSaved }) {
             <div className={styles.field}>
               <label className={styles.label}>Role</label>
               <input className={styles.input} value={form.role} onChange={e => set("role", e.target.value)} placeholder="e.g. Head of Design" />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Store Name</label>
+              <select className={styles.input} value={form.storeName} onChange={e => set("storeName", e.target.value)}>
+                <option value="">— Select a store —</option>
+                {storeOptions.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Department</label>

@@ -72,24 +72,21 @@ function sectionTitle(doc, text, y) {
   return y + 5;
 }
 
-function exportSalesPDF(filteredSales, dateFrom, dateTo) {
+async function exportSalesPDF(salesStats, topItems, topBuyers, inventoryItems, dateFrom, dateTo) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let y = pdfHeader(doc, "Sales Report", dateFrom, dateTo);
 
-  // ── Summary stats ──────────────────────────────────────────────────
-  const total     = filteredSales.reduce((s, l) => s + (l.totalPrice || 0), 0);
-  const paid      = filteredSales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
-  const remaining = filteredSales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
-
+  // ── Summary stats (matches the on-screen cards + Total Profit) ─────
   y = sectionTitle(doc, "Summary", y);
   autoTable(doc, {
     startY: y,
-    head: [["Total Sales", "Transactions", "Paid", "Remaining"]],
+    head: [["Total Sales", "Transactions", "Paid", "Remaining", "Total Profit"]],
     body: [[
-      `P${total.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
-      filteredSales.length,
-      `P${paid.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
-      `P${remaining.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+      `P${fmt(salesStats.total)}`,
+      salesStats.count,
+      `P${fmt(salesStats.paid)}`,
+      `P${fmt(salesStats.remaining)}`,
+      `P${fmt(salesStats.profit)}`,
     ]],
     headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
     bodyStyles: { fillColor: LGOLD },
@@ -97,99 +94,105 @@ function exportSalesPDF(filteredSales, dateFrom, dateTo) {
   });
   y = doc.lastAutoTable.finalY + 8;
 
-  // ── Top Selling Items ──────────────────────────────────────────────
-  const itemMap = {};
-  filteredSales.forEach(l => {
-    const item = (l.item || "Unknown").trim();
-    if (!itemMap[item]) itemMap[item] = { count: 0, total: 0 };
-    itemMap[item].count += 1;
-    itemMap[item].total += (l.totalPrice || 0);
+  // ── Top Selling Items (with image + profit per item) ──────────────
+  // Resolve each item name to its inventory image URL (case-insensitive).
+  const imgByName = {};
+  (inventoryItems || []).forEach(inv => {
+    if (inv?.name) imgByName[inv.name.trim().toLowerCase()] = inv.image || null;
   });
-  const topItems = Object.entries(itemMap)
-    .sort((a, b) => b[1].total - a[1].total)
-    .map(([name, d], i) => [i + 1, name, d.count, `P${d.total.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`]);
+  const topImages = await Promise.all(
+    topItems.map(it => loadImage(imgByName[(it.name || "").trim().toLowerCase()]))
+  );
 
+  const topItemRows = topItems.map((it, i) => [
+    i + 1, "", it.name, it.count, `P${fmt(it.total)}`, `P${fmt(it.profit)}`,
+  ]);
   y = sectionTitle(doc, "Top Selling Items", y);
   autoTable(doc, {
     startY: y,
-    head: [["#", "Item", "Sales", "Total"]],
-    body: topItems.length ? topItems : [["", "No data", "", ""]],
+    head: [["#", "Image", "Item", "Sales", "Total", "Profit"]],
+    body: topItemRows.length ? topItemRows : [["", "", "No data", "", "", ""]],
     headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
-    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 20 }, 3: { cellWidth: 35 } },
+    styles: { valign: "middle", minCellHeight: 16 },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      1: { cellWidth: 18, halign: "center" },
+      3: { cellWidth: 20 },
+      4: { cellWidth: 30 },
+      5: { cellWidth: 30 },
+    },
     margin: { left: 14, right: 14 },
+    didDrawCell: data => {
+      if (data.section !== "body" || data.column.index !== 1) return;
+      const img = topImages[data.row.index];
+      if (!img) return;
+      const size = 14;
+      const x = data.cell.x + (data.cell.width  - size) / 2;
+      const cy = data.cell.y + (data.cell.height - size) / 2;
+      try { doc.addImage(img, "JPEG", x, cy, size, size); } catch {}
+    },
   });
   y = doc.lastAutoTable.finalY + 8;
 
   // ── Top Buyers ─────────────────────────────────────────────────────
-  const buyerMap = {};
-  filteredSales.forEach(l => {
-    const buyer = (l.customerName || "Unknown").trim();
-    if (!buyerMap[buyer]) buyerMap[buyer] = { count: 0, total: 0 };
-    buyerMap[buyer].count += 1;
-    buyerMap[buyer].total += (l.totalPrice || 0);
-  });
-  const topBuyers = Object.entries(buyerMap)
-    .sort((a, b) => b[1].total - a[1].total)
-    .map(([name, d], i) => [i + 1, name, d.count, `P${d.total.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`]);
-
+  const topBuyerRows = topBuyers.map((b, i) => [i + 1, b.name, b.count, `P${fmt(b.total)}`]);
   y = sectionTitle(doc, "Top Buyers", y);
   autoTable(doc, {
     startY: y,
     head: [["#", "Buyer", "Orders", "Total"]],
-    body: topBuyers.length ? topBuyers : [["", "No data", "", ""]],
+    body: topBuyerRows.length ? topBuyerRows : [["", "No data", "", ""]],
     headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
     columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 20 }, 3: { cellWidth: 35 } },
-    margin: { left: 14, right: 14 },
-  });
-  y = doc.lastAutoTable.finalY + 8;
-
-  // ── All Transactions ───────────────────────────────────────────────
-  doc.addPage();
-  y = pdfHeader(doc, "Sales Report — All Transactions", dateFrom, dateTo);
-  y = sectionTitle(doc, "Transactions", y);
-  const txRows = [...filteredSales]
-    .sort((a, b) => (b.totalPrice || 0) - (a.totalPrice || 0))
-    .map(l => [
-      l.customerName || "—",
-      l.item || "—",
-      `P${(l.totalPrice || 0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
-      `P${(l.remainingBalance || 0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
-      l.purchaseDate || "—",
-      l.status || "—",
-    ]);
-  autoTable(doc, {
-    startY: y,
-    head: [["Customer", "Item", "Total", "Remaining", "Date", "Status"]],
-    body: txRows.length ? txRows : [["No data", "", "", "", "", ""]],
-    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
-    styles: { fontSize: 8 },
     margin: { left: 14, right: 14 },
   });
 
   doc.save("sales_report.pdf");
 }
 
-function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo) {
+// Preload an image URL into an HTMLImageElement so jsPDF can embed it
+// synchronously. Resolves to null on failure so the export doesn't crash.
+function loadImage(url) {
+  return new Promise(resolve => {
+    if (!url) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload  = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+async function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let y = pdfHeader(doc, "Inventory Report", dateFrom, dateTo);
 
-  // ── Summary stats ──────────────────────────────────────────────────
+  // ── Summary stats (matches the on-screen cards + Total Profit) ─────
   const inStock  = filteredItems.filter(i => i.status === "In Stock").length;
   const lowStock = filteredItems.filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock").length;
   const value    = filteredItems.reduce((s, i) => s + (i.sellingPrice || i.price || 0) * (i.quantity || 0), 0);
+  const grams    = filteredItems.reduce((s, i) => s + (Number(i.grams) || 0) * (i.quantity || 0), 0);
+  const cost     = filteredItems.reduce((s, i) => s + (Number(i.price) || 0) * (i.quantity || 0), 0);
+  const profit   = filteredItems.reduce((s, i) => {
+    const sp = Number(i.sellingPrice) || 0;
+    const cp = Number(i.price) || 0;
+    return s + Math.max(0, sp - cp) * (i.quantity || 0);
+  }, 0);
 
   y = sectionTitle(doc, "Summary", y);
   autoTable(doc, {
     startY: y,
-    head: [["Total Products", "In Stock", "Low / Out of Stock", "Inventory Value"]],
+    head: [["Total Products", "Total Grams", "Total Cost", "Total Profit", "In Stock", "Low / Out", "Inventory Value"]],
     body: [[
       filteredItems.length,
+      `${fmt(grams)}g`,
+      `P${fmt(cost)}`,
+      `P${fmt(profit)}`,
       inStock,
       lowStock,
-      `P${value.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`,
+      `P${fmt(value)}`,
     ]],
-    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
-    bodyStyles: { fillColor: LGOLD },
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold", fontSize: 7 },
+    bodyStyles: { fillColor: LGOLD, fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
   y = doc.lastAutoTable.finalY + 8;
@@ -235,26 +238,55 @@ function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo) {
     y = doc.lastAutoTable.finalY + 8;
   }
 
-  // ── All Items ──────────────────────────────────────────────────────
+  // ── All Items (with image + profit per item) ──────────────────────
   doc.addPage();
   y = pdfHeader(doc, "Inventory Report — All Items", dateFrom, dateTo);
   y = sectionTitle(doc, "All Items", y);
+
+  // Sort first, then preload images so the image index aligns with row index.
+  const sortedItems = [...filteredItems].sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
+  const images = await Promise.all(sortedItems.map(i => loadImage(i.image)));
+
   const cols = adminView
-    ? ["Item", "Category", "Qty", "Cost", "Selling Price", "Supplier", "Status"]
-    : ["Item", "Category", "Qty", "Cost", "Selling Price", "Status"];
-  const allRows = [...filteredItems]
-    .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
-    .map(i => adminView
-      ? [i.name||"—", i.category||"—", i.quantity??0, `P${(i.price||0).toLocaleString()}`, `P${(i.sellingPrice||0).toLocaleString()}`, i.supplier||"—", i.status||"—"]
-      : [i.name||"—", i.category||"—", i.quantity??0, `P${(i.price||0).toLocaleString()}`, `P${(i.sellingPrice||0).toLocaleString()}`, i.status||"—"]
-    );
+    ? ["Image", "Item", "Category", "Qty", "Cost", "Selling Price", "Profit", "Supplier", "Status"]
+    : ["Image", "Item", "Category", "Qty", "Cost", "Selling Price", "Profit", "Status"];
+
+  const itemProfit = i => {
+    const sp = Number(i.sellingPrice) || 0;
+    const cp = Number(i.price) || 0;
+    return Math.max(0, sp - cp) * (i.quantity || 0);
+  };
+
+  const allRows = sortedItems.map(i => {
+    const base = [
+      "", // image cell — drawn in didDrawCell
+      i.name || "—",
+      i.category || "—",
+      i.quantity ?? 0,
+      `P${(i.price || 0).toLocaleString()}`,
+      `P${(i.sellingPrice || 0).toLocaleString()}`,
+      `P${fmt(itemProfit(i))}`,
+    ];
+    return adminView ? [...base, i.supplier || "—", i.status || "—"] : [...base, i.status || "—"];
+  });
+
   autoTable(doc, {
     startY: y,
     head: [cols],
     body: allRows.length ? allRows : [Array(cols.length).fill("")],
     headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold" },
-    styles: { fontSize: 8 },
+    styles: { fontSize: 8, valign: "middle", minCellHeight: 16 },
+    columnStyles: { 0: { cellWidth: 18, halign: "center" } },
     margin: { left: 14, right: 14 },
+    didDrawCell: data => {
+      if (data.section !== "body" || data.column.index !== 0) return;
+      const img = images[data.row.index];
+      if (!img) return;
+      const size = 14;
+      const x = data.cell.x + (data.cell.width  - size) / 2;
+      const cy = data.cell.y + (data.cell.height - size) / 2;
+      try { doc.addImage(img, "JPEG", x, cy, size, size); } catch {}
+    },
   });
 
   doc.save("inventory_report.pdf");
@@ -280,6 +312,9 @@ export default function ReportsPage() {
   const [dateFrom, setDateFrom]           = useState("");
   const [dateTo, setDateTo]               = useState("");
   const [actionFilter, setActionFilter]   = useState([]);
+  const [teamFilter, setTeamFilter]       = useState([]);
+  const [termsFilter, setTermsFilter]     = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState([]);
   const [page, setPage]                   = useState(0);
 
   useEffect(() => {
@@ -312,13 +347,15 @@ export default function ReportsPage() {
   };
 
   // ── Date-filtered slices used for summary stats ────────────────────
+  // Rows with a missing/unparseable date are kept in the result — otherwise
+  // setting any date range silently drops them and the totals look broken.
   const filteredSales = useMemo(() => {
     if (!dateFrom && !dateTo) return sales;
     const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
     const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;
     return sales.filter(l => {
       const d = parsePurchaseDate(l.purchaseDate);
-      if (!d) return false;
+      if (!d) return true;
       if (from && d < from) return false;
       if (to   && d > to)   return false;
       return true;
@@ -330,43 +367,138 @@ export default function ReportsPage() {
     const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
     const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;
     return inventoryItems.filter(i => {
-      if (!i.createdAt) return false;
+      if (!i.createdAt) return true;
       const d = new Date(i.createdAt);
+      if (isNaN(d)) return true;
       if (from && d < from) return false;
       if (to   && d > to)   return false;
       return true;
     });
   }, [inventoryItems, dateFrom, dateTo]);
 
-  // ── Sales summary stats ────────────────────────────────────────────
+  // Items used for the Inventory PDF export: date range (via
+  // filteredInventoryItems) + the category and action-type filters shown in
+  // the sidebar. Action type has no direct field on an inventory item, so
+  // we narrow to items that appear as targets in the filtered inventory
+  // activity logs.
+  const exportInventoryItems = useMemo(() => {
+    let items = filteredInventoryItems;
+    if (categoryFilter.length > 0) {
+      items = items.filter(i => categoryFilter.includes(i.category));
+    }
+    if (actionFilter.length > 0) {
+      const allowedNames = new Set();
+      inventoryLogs.forEach(l => {
+        if (!actionFilter.includes(l.actionType)) return;
+        if (dateFrom || dateTo) {
+          const logDate = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : null;
+          if (dateFrom && logDate && logDate < dateFrom) return;
+          if (dateTo   && logDate && logDate > dateTo)   return;
+        }
+        const name = (l.targetName || "").trim().toLowerCase();
+        if (name) allowedNames.add(name);
+      });
+      items = items.filter(i => allowedNames.has((i.name || "").trim().toLowerCase()));
+    }
+    return items;
+  }, [filteredInventoryItems, categoryFilter, actionFilter, inventoryLogs, dateFrom, dateTo]);
+
+  // ── Sales activity logs filtered by date range only ───────────────
+  // Used to drive the summary stats so the date picker actually controls
+  // the numbers — and so the totals reflect activity history (Added/Paid
+  // entries) rather than the current sales-table snapshot, which may have
+  // been edited or deleted since.
+  const dateFilteredSalesLogs = useMemo(() => {
+    if (!dateFrom && !dateTo) return salesLogs;
+    return salesLogs.filter(log => {
+      if (!log.createdAt) return true;
+      const logDate = new Date(log.createdAt).toISOString().slice(0, 10);
+      if (dateFrom && logDate < dateFrom) return false;
+      if (dateTo   && logDate > dateTo)   return false;
+      return true;
+    });
+  }, [salesLogs, dateFrom, dateTo]);
+
+  // Extract a peso amount that follows a specific label in the log details
+  // string. Handles formats like "Total ₱19,500", "Payment ₱10.00", etc.
+  const extractAmount = (text, label) => {
+    if (!text) return 0;
+    const re = new RegExp(label + "\\s*₱?\\s*([\\d,]+(?:\\.\\d+)?)", "i");
+    const m  = text.match(re);
+    if (!m) return 0;
+    const n = parseFloat(m[1].replace(/,/g, ""));
+    return isNaN(n) ? 0 : n;
+  };
+
+  // Split "Customer Name / Item Name" target into [customer, item]
+  const splitTarget = (target) => {
+    if (!target) return ["Unknown", "Unknown"];
+    const idx = target.indexOf(" / ");
+    if (idx < 0) return [target.trim(), "Unknown"];
+    return [target.slice(0, idx).trim(), target.slice(idx + 3).trim()];
+  };
+
+  // Lookup inventory by item name (lowercased) for expected-profit math.
+  const inventoryByName = useMemo(() => {
+    const map = {};
+    inventoryItems.forEach(i => {
+      if (i?.name) map[i.name.trim().toLowerCase()] = i;
+    });
+    return map;
+  }, [inventoryItems]);
+
+  // Expected profit per sale = (selling price − cost) × qty sold,
+  // looked up from the inventory item. This ignores any discount applied
+  // on the sale, so the report shows the gross profit you would have
+  // earned at list price. Falls back to the stored sale.profit when no
+  // matching inventory item exists.
+  const expectedProfit = (sale) => {
+    const inv = inventoryByName[(sale.item || "").trim().toLowerCase()];
+    if (inv) {
+      const sp = Number(inv.sellingPrice) || 0;
+      const cp = Number(inv.price) || 0;
+      const qty = Number(sale.quantity) || 1;
+      return Math.max(0, sp - cp) * qty;
+    }
+    return Number(sale.profit) || 0;
+  };
+
+  // ── Sales summary stats (derived directly from the sales records) ──
   const salesStats = useMemo(() => {
-    const total     = filteredSales.reduce((s, l) => s + (l.totalPrice || 0), 0);
-    const paid      = filteredSales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
-    const remaining = filteredSales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
-    return { total, count: filteredSales.length, paid, remaining };
-  }, [filteredSales]);
+    let total = 0, paid = 0, remaining = 0, profit = 0;
+    filteredSales.forEach(s => {
+      const t = Number(s.totalPrice) || 0;
+      const r = Number(s.remainingBalance) || 0;
+      total     += t;
+      remaining += r;
+      paid      += Math.max(0, t - r);
+      profit    += expectedProfit(s);
+    });
+    return { total, count: filteredSales.length, paid, remaining, profit };
+  }, [filteredSales, inventoryByName]);
 
   const topSalesItems = useMemo(() => {
     const map = {};
-    filteredSales.forEach(l => {
-      const item = (l.item || "Unknown").trim();
-      if (!map[item]) map[item] = { count: 0, total: 0 };
-      map[item].count += 1;
-      map[item].total += (l.totalPrice || 0);
+    filteredSales.forEach(s => {
+      const name = (s.item || "Unknown").trim() || "Unknown";
+      if (!map[name]) map[name] = { count: 0, total: 0, profit: 0 };
+      map[name].count  += 1;
+      map[name].total  += Number(s.totalPrice) || 0;
+      map[name].profit += expectedProfit(s);
     });
     return Object.entries(map)
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
-      .map(([name, data]) => ({ name, count: data.count, total: data.total }));
-  }, [filteredSales]);
+      .map(([name, data]) => ({ name, count: data.count, total: data.total, profit: data.profit }));
+  }, [filteredSales, inventoryByName]);
 
   const topSalesBuyers = useMemo(() => {
     const map = {};
-    filteredSales.forEach(l => {
-      const buyer = (l.customerName || "Unknown").trim();
-      if (!map[buyer]) map[buyer] = { count: 0, total: 0 };
-      map[buyer].count += 1;
-      map[buyer].total += (l.totalPrice || 0);
+    filteredSales.forEach(s => {
+      const name = (s.customerName || "Unknown").trim() || "Unknown";
+      if (!map[name]) map[name] = { count: 0, total: 0 };
+      map[name].count += 1;
+      map[name].total += Number(s.totalPrice) || 0;
     });
     return Object.entries(map)
       .sort((a, b) => b[1].total - a[1].total)
@@ -380,7 +512,9 @@ export default function ReportsPage() {
     const inStock  = filteredInventoryItems.filter(i => i.status === "In Stock").length;
     const lowStock = filteredInventoryItems.filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock").length;
     const value    = filteredInventoryItems.reduce((s, i) => s + (i.sellingPrice || i.price || 0) * (i.quantity || 0), 0);
-    return { total, inStock, lowStock, value };
+    const grams    = filteredInventoryItems.reduce((s, i) => s + (Number(i.grams) || 0) * (i.quantity || 0), 0);
+    const cost     = filteredInventoryItems.reduce((s, i) => s + (Number(i.price) || 0) * (i.quantity || 0), 0);
+    return { total, inStock, lowStock, value, grams, cost };
   }, [filteredInventoryItems]);
 
   const lowStockItems = useMemo(() => {
@@ -406,6 +540,40 @@ export default function ReportsPage() {
   }, [filteredInventoryItems]);
 
   // ── Activity log filtering ─────────────────────────────────────────
+  // Lookup table: "customer / item" (lowercased) → SalesLoan, used to
+  // filter sales activity logs by team / payment terms (those fields live
+  // on the SalesLoan, not the activity log itself).
+  const salesByTargetForFilter = useMemo(() => {
+    const map = {};
+    sales.forEach(s => {
+      const key = `${(s.customerName || "").trim()} / ${(s.item || "").trim()}`.toLowerCase();
+      if (!map[key]) map[key] = s;
+    });
+    return map;
+  }, [sales]);
+
+  // Lookup: inventory log targetName (lowercased) → category. Inventory
+  // activity logs store the item name in `targetName`, so we resolve the
+  // category from the live inventory list.
+  const categoryByItemName = useMemo(() => {
+    const map = {};
+    inventoryItems.forEach(i => {
+      if (i?.name) map[i.name.trim().toLowerCase()] = i.category || "";
+    });
+    return map;
+  }, [inventoryItems]);
+
+  // All categories that show up on the current inventory tab — used to
+  // populate the filter sidebar. Sorted alphabetically.
+  const inventoryCategories = useMemo(() => {
+    const set = new Set();
+    inventoryLogs.forEach(l => {
+      const cat = categoryByItemName[(l.targetName || "").trim().toLowerCase()];
+      if (cat) set.add(cat);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [inventoryLogs, categoryByItemName]);
+
   const filtered = useMemo(() => {
     return rawLogs.filter(log => {
       if (search) {
@@ -425,9 +593,23 @@ export default function ReportsPage() {
         const logDate = new Date(log.createdAt).toISOString().slice(0, 10);
         if (logDate > dateTo) return false;
       }
+      // Team / payment terms — prefer values stored directly on the log
+      // (set at write time), fall back to the linked sale for legacy rows.
+      if (teamFilter.length > 0 || termsFilter.length > 0) {
+        const sale = salesByTargetForFilter[(log.targetName || "").trim().toLowerCase()];
+        const logTeam  = log.team         || (sale && sale.team)         || null;
+        const logTerms = log.paymentTerms || (sale && sale.paymentTerms) || null;
+        if (teamFilter.length  > 0 && (!logTeam  || !teamFilter.includes(logTeam)))   return false;
+        if (termsFilter.length > 0 && (!logTerms || !termsFilter.includes(logTerms))) return false;
+      }
+      // Inventory category — only meaningful for inventory logs.
+      if (categoryFilter.length > 0) {
+        const cat = categoryByItemName[(log.targetName || "").trim().toLowerCase()];
+        if (!cat || !categoryFilter.includes(cat)) return false;
+      }
       return true;
     });
-  }, [rawLogs, search, actionFilter, dateFrom, dateTo]);
+  }, [rawLogs, search, actionFilter, dateFrom, dateTo, teamFilter, termsFilter, categoryFilter, salesByTargetForFilter, categoryByItemName]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pagedData  = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
@@ -436,12 +618,24 @@ export default function ReportsPage() {
   const toggleAction = (a) =>
     setActionFilter(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a]);
 
+  const toggleTeam = (t) =>
+    setTeamFilter(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
+
+  const toggleTerms = (t) =>
+    setTermsFilter(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
+
+  const toggleCategory = (c) =>
+    setCategoryFilter(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c]);
+
   const clearFilters = () => {
-    setSearch(""); setDateFrom(""); setDateTo(""); setActionFilter([]); setPage(0);
+    setSearch(""); setDateFrom(""); setDateTo("");
+    setActionFilter([]); setTeamFilter([]); setTermsFilter([]); setCategoryFilter([]);
+    setPage(0);
   };
 
   const handleTabChange = (tab) => {
-    setActiveTab(tab); setPage(0); setActionFilter([]);
+    setActiveTab(tab); setPage(0);
+    setActionFilter([]); setTeamFilter([]); setTermsFilter([]); setCategoryFilter([]);
   };
 
   return (
@@ -466,9 +660,9 @@ export default function ReportsPage() {
                 className={styles.exportBtn}
                 onClick={() => {
                   if (activeTab === "Sales") {
-                    exportSalesPDF(filteredSales, dateFrom, dateTo);
+                    exportSalesPDF(salesStats, topSalesItems, topSalesBuyers, inventoryItems, dateFrom, dateTo);
                   } else {
-                    exportInventoryPDF(filteredInventoryItems, isAdmin(), dateFrom, dateTo);
+                    exportInventoryPDF(exportInventoryItems, isAdmin(), dateFrom, dateTo);
                   }
                 }}
               >
@@ -504,10 +698,13 @@ export default function ReportsPage() {
                   <StatCard icon="📋" label="Transactions" value={salesStats.count} accent="#7cab7f" />
                   <StatCard icon="✓" label="Paid" value={`₱${fmt(salesStats.paid)}`} accent="#9fc39d" />
                   <StatCard icon="⏳" label="Remaining" value={`₱${fmt(salesStats.remaining)}`} accent="#ef8767" />
+                  <StatCard icon="📈" label="Total Profit" value={`₱${fmt(salesStats.profit)}`} accent="#8a7a4d" />
                 </>
               ) : (
                 <>
                   <StatCard icon="📦" label="Total Products" value={invStats.total} accent="#c9a84c" />
+                  <StatCard icon="⚖" label="Total Grams" value={`${fmt(invStats.grams)}g`} accent="#b08968" />
+                  <StatCard icon="🏷" label="Total Cost" value={`₱${fmt(invStats.cost)}`} accent="#8a7a4d" />
                   <StatCard icon="✓" label="In Stock" value={invStats.inStock} accent="#7cab7f" />
                   <StatCard icon="⚠" label="Low Stock" value={invStats.lowStock} accent="#f0c247" />
                   <StatCard icon="💵" label="Inventory Value" value={`₱${fmt(invStats.value)}`} accent="#9b8ec4" />
@@ -762,6 +959,100 @@ export default function ReportsPage() {
               })}
             </div>
           </div>
+
+          {/* Team — only shown on Sales tab (inventory logs have no team) */}
+          {activeTab === "Sales" && (
+            <div className={styles.filterCard}>
+              <div className={styles.cardTop}><span className={styles.cardTitle}>Team</span></div>
+              <div className={styles.optionList}>
+                {["Team A", "Team B", "Team C", "Team D", "Team E"].map(t => {
+                  const count = rawLogs.filter(l => {
+                    const sale = salesByTargetForFilter[(l.targetName || "").trim().toLowerCase()];
+                    return (l.team || (sale && sale.team)) === t;
+                  }).length;
+                  return (
+                    <label key={t} className={styles.optionRow}>
+                      <div className={styles.optionLeft}>
+                        <input type="checkbox"
+                          checked={teamFilter.includes(t)}
+                          onChange={() => { toggleTeam(t); setPage(0); }} />
+                        <span className={styles.actionDot}
+                          style={{ background: "#fef3c7", color: "#92400e" }}>
+                          {t}
+                        </span>
+                      </div>
+                      <span className={styles.optionCount}>{count}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Payment Terms — only shown on Sales tab */}
+          {activeTab === "Sales" && (
+            <div className={styles.filterCard}>
+              <div className={styles.cardTop}><span className={styles.cardTitle}>Payment Terms</span></div>
+              <div className={styles.optionList}>
+                {["Cash", "Layaway"].map(t => {
+                  const count = rawLogs.filter(l => {
+                    const sale = salesByTargetForFilter[(l.targetName || "").trim().toLowerCase()];
+                    return (l.paymentTerms || (sale && sale.paymentTerms)) === t;
+                  }).length;
+                  const color = t === "Cash"
+                    ? { bg: "#dcfce7", color: "#166534" }
+                    : { bg: "#dbeafe", color: "#1e40af" };
+                  return (
+                    <label key={t} className={styles.optionRow}>
+                      <div className={styles.optionLeft}>
+                        <input type="checkbox"
+                          checked={termsFilter.includes(t)}
+                          onChange={() => { toggleTerms(t); setPage(0); }} />
+                        <span className={styles.actionDot}
+                          style={{ background: color.bg, color: color.color }}>
+                          {t}
+                        </span>
+                      </div>
+                      <span className={styles.optionCount}>{count}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Category — only shown on Inventory tab */}
+          {activeTab === "Inventory" && (
+            <div className={styles.filterCard}>
+              <div className={styles.cardTop}><span className={styles.cardTitle}>Category</span></div>
+              <div className={styles.optionList} style={{ maxHeight: 240, overflowY: "auto" }}>
+                {inventoryCategories.length === 0 && (
+                  <div style={{ padding: "8px 4px", color: "#999", fontSize: 12 }}>
+                    No categories
+                  </div>
+                )}
+                {inventoryCategories.map(c => {
+                  const count = inventoryLogs.filter(l =>
+                    categoryByItemName[(l.targetName || "").trim().toLowerCase()] === c
+                  ).length;
+                  return (
+                    <label key={c} className={styles.optionRow}>
+                      <div className={styles.optionLeft}>
+                        <input type="checkbox"
+                          checked={categoryFilter.includes(c)}
+                          onChange={() => { toggleCategory(c); setPage(0); }} />
+                        <span className={styles.actionDot}
+                          style={{ background: "#e0e7ff", color: "#3730a3" }}>
+                          {c}
+                        </span>
+                      </div>
+                      <span className={styles.optionCount}>{count}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <button className={styles.clearBtn} onClick={clearFilters}>Clear Filters</button>
         </aside>

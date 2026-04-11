@@ -4,9 +4,6 @@ import { isAdmin, canAddInventory, canEditInventory, canDeleteInventory, canMana
 
 import API from "../../config";
 
-const CLOUDINARY_CLOUD_NAME   = "dm8tng6rp";
-const CLOUDINARY_UPLOAD_PRESET = "inventory_upload";
-
 function getUser() {
   try { return JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "null"); }
   catch { return null; }
@@ -62,20 +59,27 @@ export default function InventoryPage() {
   const addImgRef  = useRef(null);
   const editImgRef = useRef(null);
 
+  // Uploads go through the backend (POST /api/inventory/upload-image),
+  // which uses signed Cloudinary uploads with overwrite=true. The backend
+  // derives the public_id from the original file name and explicitly
+  // destroys any existing asset with that name before writing the new
+  // one — so re-uploading "bracelet.jpg" replaces the previous asset
+  // instead of creating a duplicate.
   const uploadImageFile = async (file, cb, setUploading) => {
     if (!file) return;
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    formData.append("folder", "inventory");
     try {
-      const res  = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+      const res  = await fetch(`${API}/api/inventory/upload-image`, { method: "POST", body: formData });
       const data = await res.json();
-      if (data.secure_url) {
-        cb(data.secure_url);
+      if (data.url) {
+        // Append a cache-busting query so the new image shows immediately
+        // in the UI even if the browser cached the old version under the
+        // same URL.
+        cb(`${data.url}?v=${Date.now()}`);
       } else {
-        alert("Image upload failed: " + (data.error?.message || "Unknown error"));
+        alert("Image upload failed: " + (data.error || "Unknown error"));
       }
     } catch {
       alert("Image upload failed. Please try again.");

@@ -113,7 +113,7 @@ export default function CalendarDay({ cell }) {
         <div className={styles.dayPopup} ref={popupRef}>
           <div className={styles.popupHeader}>
             <span className={styles.popupDate}>Day {cell.label}</span>
-            <button className={styles.popupClose} onClick={(e) => { e.stopPropagation(); setPopupOpen(false); }}>?</button>
+            <button className={styles.popupClose} onClick={(e) => { e.stopPropagation(); setPopupOpen(false); }}>✕</button>
           </div>
           <div className={styles.popupBody}>
             {items.map((it, i) => (

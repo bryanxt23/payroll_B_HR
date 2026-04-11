@@ -7,7 +7,13 @@
 }
 
 *{ box-sizing:border-box; }
-html,body{ height:100%; }
+html,body{
+  min-height:100%;
+  overflow:auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 body{
   margin:0;
@@ -17,9 +23,14 @@ body{
 }
 
 .page{
+  min-width:1400px;
+  width:100%;
   min-height:100vh;
   display:flex;
-  align-items:center;
-  justify-content:center;
+  align-items:flex-start;
+  justify-content:flex-start;
   padding:26px;
+  overflow: visible;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }

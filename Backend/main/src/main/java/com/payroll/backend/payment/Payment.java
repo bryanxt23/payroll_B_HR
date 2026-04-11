@@ -19,6 +19,11 @@ public class Payment {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    private String team;
+
+    @Column(name = "payment_terms")
+    private String paymentTerms;
+
     @PrePersist
     protected void onCreate() { if (this.paidAt == null) this.paidAt = LocalDateTime.now(); }
 
@@ -32,4 +37,10 @@ public class Payment {
 
     public LocalDateTime getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
+
+    public String getTeam() { return team; }
+    public void setTeam(String team) { this.team = team; }
+
+    public String getPaymentTerms() { return paymentTerms; }
+    public void setPaymentTerms(String paymentTerms) { this.paymentTerms = paymentTerms; }
 }

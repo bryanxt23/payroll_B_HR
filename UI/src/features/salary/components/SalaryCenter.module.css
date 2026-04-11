@@ -54,6 +54,26 @@
   color: rgba(0,0,0,.55);
 }
 
+.salaryToggle{
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+  cursor: pointer;
+  color: rgba(0,0,0,.45);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s ease, background .15s ease;
+}
+
+.salaryToggle:hover{
+  color: rgba(0,0,0,.75);
+  background: rgba(0,0,0,.05);
+}
+
 .monthPill{
   margin-left:auto;
   padding: 10px 12px;

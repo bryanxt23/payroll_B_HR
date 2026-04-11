@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./SettingsPage.module.css";
 import API from "../../config";
+import { getStores, setStoreName } from "../../utils/stores";
 
 const BUILTIN_ROLES = new Set(["Admin", "user", "userS", "userI", "userSI"]);
 
@@ -13,14 +14,6 @@ const BUILTIN_ROLE_DESCS = [
   { name: "userSI", desc: "Sales + Inventory — add & edit (no delete)",                          badge: styles.badgeUserSI },
 ];
 
-// Fixed 5 stores — always shown in user modal
-const STORES = [
-  { id: 1, name: "MR STYLES STORE 1" },
-  { id: 2, name: "MR STYLES STORE 2" },
-  { id: 3, name: "MR STYLES STORE 3" },
-  { id: 4, name: "MR STYLES STORE 4" },
-  { id: 5, name: "MR STYLES STORE 5" },
-];
 
 const EMPTY_USER = { username: "", email: "", password: "", role: "user", allowedStores: "", employeeCode: "" };
 const EMPTY_ROLE = {
@@ -59,6 +52,20 @@ export default function SettingsPage() {
   const [roleForm,      setRoleForm]      = useState(EMPTY_ROLE);
   const [roleSaving,    setRoleSaving]    = useState(false);
   const [roleError,     setRoleError]     = useState("");
+
+  // Stores — names are persisted in localStorage via the shared util
+  const [stores,        setStores]        = useState(() => getStores());
+  const [storeDrafts,   setStoreDrafts]   = useState(() => {
+    const map = {};
+    getStores().forEach(s => { map[s.id] = s.name; });
+    return map;
+  });
+  const [storeSavedId,  setStoreSavedId]  = useState(null);
+
+  // Cloudinary cleanup
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [cleanupResult,  setCleanupResult]  = useState(null);
+  const [cleanupError,   setCleanupError]   = useState("");
 
   useEffect(() => {
     fetchUsers();
@@ -107,8 +114,59 @@ export default function SettingsPage() {
   };
 
   const storeLabel = (sid) => {
-    const store = STORES.find(s => String(s.id) === sid.trim());
+    const store = stores.find(s => String(s.id) === sid.trim());
     return store ? store.name : `Store ${sid}`;
+  };
+
+  // ── Store rename ──────────────────────────────────────────────────
+  const handleSaveStore = (id) => {
+    setStoreName(id, storeDrafts[id]);
+    const refreshed = getStores();
+    setStores(refreshed);
+    const map = {};
+    refreshed.forEach(s => { map[s.id] = s.name; });
+    setStoreDrafts(map);
+    setStoreSavedId(id);
+    setTimeout(() => setStoreSavedId(null), 1500);
+  };
+  // ── Cloudinary cleanup ────────────────────────────────────────────
+  const handleCleanupCloudinary = async () => {
+    if (!window.confirm(
+      "Scan Cloudinary and delete duplicate inventory images?\n\n" +
+      "For each set of images sharing the same original filename, the " +
+      "newest one is kept and the rest are deleted. Images currently " +
+      "used by an inventory item are always preserved.\n\n" +
+      "This cannot be undone."
+    )) return;
+
+    setCleanupRunning(true);
+    setCleanupError("");
+    setCleanupResult(null);
+    try {
+      const r = await fetch(`${API}/api/inventory/cleanup-duplicates`, {
+        method: "POST",
+        headers: { "X-User-Role": me?.role || "" },
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) {
+        setCleanupError(data.error || `Request failed (${r.status})`);
+      } else {
+        setCleanupResult(data);
+      }
+    } catch (e) {
+      setCleanupError("Request failed: " + (e.message || "unknown"));
+    } finally {
+      setCleanupRunning(false);
+    }
+  };
+
+  const handleResetStore = (id) => {
+    setStoreName(id, "");
+    const refreshed = getStores();
+    setStores(refreshed);
+    const map = {};
+    refreshed.forEach(s => { map[s.id] = s.name; });
+    setStoreDrafts(map);
   };
 
   // ── User CRUD ─────────────────────────────────────────────────────
@@ -192,6 +250,8 @@ export default function SettingsPage() {
         <div className={styles.tabBar}>
           <button className={`${styles.tabBtn} ${tab === "users" ? styles.tabActive : ""}`} onClick={() => setTab("users")}>Users</button>
           <button className={`${styles.tabBtn} ${tab === "roles" ? styles.tabActive : ""}`} onClick={() => setTab("roles")}>Roles</button>
+          <button className={`${styles.tabBtn} ${tab === "stores" ? styles.tabActive : ""}`} onClick={() => setTab("stores")}>Stores</button>
+          <button className={`${styles.tabBtn} ${tab === "maintenance" ? styles.tabActive : ""}`} onClick={() => setTab("maintenance")}>Maintenance</button>
         </div>
       </div>
 
@@ -304,6 +364,117 @@ export default function SettingsPage() {
         </>
       )}
 
+      {/* ══ STORES TAB ═════════════════════════════════════════════ */}
+      {tab === "stores" && (
+        <>
+          <div className={styles.sectionHeader}>
+            <span>Stores ({stores.length})</span>
+          </div>
+          <div className={styles.tableCard}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th style={{ width: 60 }}>ID</th>
+                  <th>Store Name</th>
+                  <th style={{ width: 220 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stores.map(s => (
+                  <tr key={s.id}>
+                    <td><span className={styles.storeCheckId}>{s.id}</span></td>
+                    <td>
+                      <input
+                        className={styles.input}
+                        value={storeDrafts[s.id] || ""}
+                        onChange={e => setStoreDrafts(d => ({ ...d, [s.id]: e.target.value }))}
+                        placeholder={`MR Styles Store ${s.id}`}
+                      />
+                    </td>
+                    <td className={styles.actions}>
+                      <button className={styles.editBtn} onClick={() => handleSaveStore(s.id)}>
+                        {storeSavedId === s.id ? "✓ Saved" : "Save"}
+                      </button>
+                      <button className={styles.deleteBtn} onClick={() => handleResetStore(s.id)}>
+                        Reset
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className={styles.hint} style={{ padding: "12px 16px", margin: 0 }}>
+              Renaming a store updates the header dropdown, the Add Employee form, and any other store reference. Refresh other open tabs to see the change.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* ══ MAINTENANCE TAB ════════════════════════════════════════ */}
+      {tab === "maintenance" && (
+        <>
+          <div className={styles.sectionHeader}>
+            <span>Cloudinary Image Cleanup</span>
+          </div>
+          <div className={styles.tableCard} style={{ padding: 20 }}>
+            <p style={{ margin: "0 0 12px", color: "#555", fontSize: 13, lineHeight: 1.5 }}>
+              Scans the Cloudinary <code>inventory/</code> folder, groups images
+              by their original filename, and deletes the older duplicates in
+              each group — keeping the most recently uploaded one.
+              Images currently in use by an inventory item are always preserved.
+            </p>
+            <p style={{ margin: "0 0 16px", color: "#92400e", fontSize: 12 }}>
+              ⚠ This cannot be undone. Run it once after enabling the new
+              upload behaviour to reclaim space taken by old random-named
+              uploads.
+            </p>
+            <button
+              className={styles.addBtn}
+              onClick={handleCleanupCloudinary}
+              disabled={cleanupRunning}
+            >
+              {cleanupRunning ? "Scanning..." : "🧹 Clean up duplicate images"}
+            </button>
+
+            {cleanupError && (
+              <div className={styles.error} style={{ marginTop: 14 }}>{cleanupError}</div>
+            )}
+
+            {cleanupResult && (
+              <div style={{ marginTop: 18, padding: 14, background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Cleanup complete</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, fontSize: 13 }}>
+                  <div><div style={{ color: "#666" }}>Scanned</div><div style={{ fontWeight: 600, fontSize: 18 }}>{cleanupResult.scanned ?? 0}</div></div>
+                  <div><div style={{ color: "#666" }}>Groups</div><div style={{ fontWeight: 600, fontSize: 18 }}>{cleanupResult.groups ?? 0}</div></div>
+                  <div><div style={{ color: "#166534" }}>Kept</div><div style={{ fontWeight: 600, fontSize: 18, color: "#166534" }}>{cleanupResult.kept ?? 0}</div></div>
+                  <div><div style={{ color: "#991b1b" }}>Deleted</div><div style={{ fontWeight: 600, fontSize: 18, color: "#991b1b" }}>{cleanupResult.deleted ?? 0}</div></div>
+                </div>
+                {Array.isArray(cleanupResult.removedPublicIds) && cleanupResult.removedPublicIds.length > 0 && (
+                  <details style={{ marginTop: 12 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: "#555" }}>
+                      Show removed public_ids ({cleanupResult.removedPublicIds.length})
+                    </summary>
+                    <ul style={{ marginTop: 8, fontSize: 11, fontFamily: "monospace", color: "#666", maxHeight: 200, overflowY: "auto", paddingLeft: 18 }}>
+                      {cleanupResult.removedPublicIds.map(id => <li key={id}>{id}</li>)}
+                    </ul>
+                  </details>
+                )}
+                {Array.isArray(cleanupResult.errors) && cleanupResult.errors.length > 0 && (
+                  <details style={{ marginTop: 8 }} open>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: "#991b1b" }}>
+                      ⚠ {cleanupResult.errors.length} error(s)
+                    </summary>
+                    <ul style={{ marginTop: 8, fontSize: 11, color: "#991b1b", paddingLeft: 18 }}>
+                      {cleanupResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* ══ USER MODAL ═════════════════════════════════════════════ */}
       {showUserModal && (
         <div className={styles.overlay} onClick={closeUserModal}>
@@ -373,7 +544,7 @@ export default function SettingsPage() {
                 <div className={styles.field}>
                   <label>Store Access <span className={styles.hint}>(leave all unchecked = all stores)</span></label>
                   <div className={styles.storeCheckList}>
-                    {STORES.map(s => {
+                    {stores.map(s => {
                       const checked = parseAllowed(userForm.allowedStores).includes(String(s.id));
                       return (
                         <label key={s.id} className={styles.storeCheckItem}>

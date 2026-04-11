@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import IconButton from "../../../components/ui/IconButton";
 import Icon from "../../../components/ui/Icon";
 import Calendar from "../calendar/Calendar";
@@ -13,6 +13,18 @@ export default function SalaryCenter({
   selectedEmployee,
   timesheetSummary = { worked: 0, overtime: 0, leave: 0 },
 }) {
+  // Remember the user's hide/show choice across reloads.
+  const [salaryHidden, setSalaryHidden] = useState(
+    () => localStorage.getItem("salaryHidden") === "1"
+  );
+  const toggleSalary = () => {
+    setSalaryHidden(prev => {
+      const next = !prev;
+      localStorage.setItem("salaryHidden", next ? "1" : "0");
+      return next;
+    });
+  };
+
   const salary = selectedEmployee?.salary != null
     ? `$${Number(selectedEmployee.salary).toLocaleString()}`
     : "—";
@@ -33,7 +45,30 @@ export default function SalaryCenter({
 
       <div className={styles.centerStats}>
         <div className={styles.hoursBig}>
-          <span>Monthly Salary</span> {salary}
+          <span>Monthly Salary</span> {salaryHidden ? "••••••" : salary}
+          <button
+            type="button"
+            className={styles.salaryToggle}
+            onClick={toggleSalary}
+            aria-label={salaryHidden ? "Show salary" : "Hide salary"}
+            title={salaryHidden ? "Show salary" : "Hide salary"}
+          >
+            {salaryHidden ? (
+              // eye-off
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.77 19.77 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.77 19.77 0 0 1-3.17 4.19" />
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            ) : (
+              // eye
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
         </div>
         <select
           className={styles.monthPill}

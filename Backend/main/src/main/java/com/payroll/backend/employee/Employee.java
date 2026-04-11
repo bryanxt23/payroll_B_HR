@@ -18,6 +18,9 @@ public class Employee {
 
     private String role;
 
+    @Column(name = "store_name")
+    private String storeName;
+
     // this is the left-side progress percentage in your UI (0-100)
     private Integer pct;
 
@@ -46,6 +49,7 @@ public class Employee {
     public String getCode() { return code; }
     public String getName() { return name; }
     public String getRole() { return role; }
+    public String getStoreName() { return storeName; }
     public Integer getPct() { return pct; }
     public String getDepartment() { return department; }
     public java.math.BigDecimal getSalary() { return salary; }
@@ -55,6 +59,7 @@ public class Employee {
     public void setCode(String code) { this.code = code; }
     public void setName(String name) { this.name = name; }
     public void setRole(String role) { this.role = role; }
+    public void setStoreName(String storeName) { this.storeName = storeName; }
     public void setPct(Integer pct) { this.pct = pct; }
     public void setDepartment(String department) { this.department = department; }
     public void setSalary(java.math.BigDecimal salary) { this.salary = salary; }

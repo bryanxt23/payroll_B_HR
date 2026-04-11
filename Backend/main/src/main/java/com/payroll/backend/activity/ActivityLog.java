@@ -24,6 +24,10 @@ public class ActivityLog {
     private String actionType;
     private String targetName;
     private String details;
+    private String team;
+
+    @Column(name = "payment_terms")
+    private String paymentTerms;
 
     @PrePersist
     public void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
@@ -59,4 +63,10 @@ public class ActivityLog {
 
     public String getDetails()    { return details; }
     public void setDetails(String details) { this.details = details; }
+
+    public String getTeam()       { return team; }
+    public void setTeam(String team) { this.team = team; }
+
+    public String getPaymentTerms() { return paymentTerms; }
+    public void setPaymentTerms(String paymentTerms) { this.paymentTerms = paymentTerms; }
 }

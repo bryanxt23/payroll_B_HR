@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "./Topbar.module.css";
+import { getStores } from "../../utils/stores";
 
 const tabs = [
   { label: "Dashboard", path: "/dashboard" },
@@ -13,14 +14,6 @@ const tabs = [
   { label: "Reports",   path: "/reports" },
 ];
 
-const ALL_STORES = [
-  { id: 1, name: "MR Styles Store 1", subtitle: "Jewelries, Accessories and More 1" },
-  { id: 2, name: "MR Styles Store 2", subtitle: "Jewelries, Accessories and More 2" },
-  { id: 3, name: "MR Styles Store 3", subtitle: "Jewelries, Accessories and More 3" },
-  { id: 4, name: "MR Styles Store 4", subtitle: "Jewelries, Accessories and More 4" },
-  { id: 5, name: "MR Styles Store 5", subtitle: "Jewelries, Accessories and More 5" },
-];
-
 function getUser() {
   try {
     return JSON.parse(sessionStorage.getItem("user") || localStorage.getItem("user") || "null");
@@ -28,11 +21,12 @@ function getUser() {
 }
 
 function getAccessibleStores(user) {
-  if (!user || user.role === "Admin") return ALL_STORES;
+  const all = getStores();
+  if (!user || user.role === "Admin") return all;
   const raw = user.allowedStores;
-  if (!raw || raw.trim() === "") return ALL_STORES;
+  if (!raw || raw.trim() === "") return all;
   const allowed = raw.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-  return ALL_STORES.filter(s => allowed.includes(s.id));
+  return all.filter(s => allowed.includes(s.id));
 }
 
 export default function Topbar() {

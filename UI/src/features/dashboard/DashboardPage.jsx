@@ -116,6 +116,7 @@ export default function DashboardPage() {
   const [catFilters, setCatFilters] = useState([]);
   const [categories, setCategories] = useState([]);
   const [dashSearch, setDashSearch] = useState("");
+  const [paymentStats, setPaymentStats] = useState({ thisDay: 0, thisMonth: 0, thisYear: 0 });
 
   useEffect(() => {
     fetch(`${API_BASE}/api/inventory`)
@@ -126,6 +127,14 @@ export default function DashboardPage() {
       .then(r => r.json()).then(d => setActivityLog(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`${API_BASE}/api/categories`)
       .then(r => r.json()).then(d => setCategories(Array.isArray(d) ? d.map(c => c.name) : [])).catch(() => {});
+    fetch(`${API_BASE}/api/payments/stats`)
+      .then(r => r.json())
+      .then(d => setPaymentStats({
+        thisDay:   Number(d?.thisDay)   || 0,
+        thisMonth: Number(d?.thisMonth) || 0,
+        thisYear:  Number(d?.thisYear)  || 0,
+      }))
+      .catch(() => {});
   }, []);
 
   const fmt = n => Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -140,7 +149,6 @@ export default function DashboardPage() {
       return new Date(parseInt(m[3]), MONTHS[m[1]], parseInt(m[2]));
     };
     const activeLoans = sales.filter(s => (s.status || "Active") === "Active");
-    const todayStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const now = new Date(); now.setHours(0,0,0,0);
     const in7 = new Date(now); in7.setDate(in7.getDate() + 7);
     return {
@@ -152,10 +160,11 @@ export default function DashboardPage() {
       pending:         inventory.filter(i => i.status === "Pending").length,
       paymentsDue:     activeLoans.filter(l => { const d = parseDate(l.dueDate); return d && d >= now && d <= in7; }).length,
       lowStockCount:   inventory.filter(i => (i.quantity || 0) <= 5 || i.status === "Out of Stock").length,
-      todaySales:      sales.filter(l => l.purchaseDate === todayStr)
-                           .reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0),
+      // Sourced from /api/payments/stats so it counts payments collected today
+      // (including partial payments on older sales), not just sales created today.
+      todaySales:      paymentStats.thisDay,
     };
-  }, [inventory, sales]);
+  }, [inventory, sales, paymentStats]);
 
   // ── Chart data ─────────────────────────────────────────────────────────────
   // Uses totalPrice (sale amount at purchase) so new loans appear immediately.
@@ -484,7 +493,7 @@ export default function DashboardPage() {
           </div>
           <div className={`${styles.strip} ${styles.stripOlive}`}>
             <span>Monthly Sales</span>
-            <span className={styles.stripVal}>₱{fmt(stats.salesThisMonth)}</span>
+            <span className={styles.stripVal}>₱{fmt(paymentStats.thisMonth)}</span>
           </div>
           <div className={`${styles.strip} ${styles.stripGold}`}>
             <span>Low Stock Count</span>

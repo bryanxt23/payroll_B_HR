@@ -119,6 +119,7 @@ public class EmployeeController {
                 .orElseThrow(() -> new RuntimeException("Employee not found: " + code));
         if (body.getName()       != null) emp.setName(body.getName());
         if (body.getRole()       != null) emp.setRole(body.getRole());
+        if (body.getStoreName()  != null) emp.setStoreName(body.getStoreName());
         if (body.getDepartment() != null) emp.setDepartment(body.getDepartment());
         if (body.getSalary()     != null) emp.setSalary(body.getSalary());
         if (body.getStatus()     != null) emp.setStatus(body.getStatus());

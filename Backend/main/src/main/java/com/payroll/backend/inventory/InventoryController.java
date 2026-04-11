@@ -3,12 +3,17 @@ package com.payroll.backend.inventory;
 import com.payroll.backend.activity.ActivityLog;
 import com.payroll.backend.activity.ActivityLogRepository;
 import com.payroll.backend.store.StoreContextHolder;
+import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -30,6 +35,57 @@ public class InventoryController {
     @GetMapping
     public List<InventoryItem> list() {
         return repo.findByStoreId(sid());
+    }
+
+    /**
+     * Upload (or replace) an inventory image. The Cloudinary public_id is
+     * derived from the original file name, so re-uploading a file with the
+     * same name destroys the previous asset and writes a new one in its
+     * place. Uses signed upload with overwrite=true + invalidate=true on
+     * the server side, so no Cloudinary preset configuration is needed.
+     */
+    @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadImage(@RequestParam("file") MultipartFile file) throws java.io.IOException {
+        String publicId = slugifyFileName(file.getOriginalFilename());
+        // Explicit destroy first, then upload — same effect as overwrite=true
+        // but also clears any stale CDN cache entries before the new asset
+        // is written. The destroy is a no-op if nothing matches.
+        cloudinaryService.deleteByPublicId("inventory/" + publicId);
+        String url = cloudinaryService.uploadWithPublicId(file, "inventory", publicId);
+        return Map.of("url", url);
+    }
+
+    /**
+     * Admin-only cleanup: scan the Cloudinary "inventory/" folder, group
+     * assets by their original filename, keep the newest one in each
+     * group plus anything still referenced by an InventoryItem row, and
+     * delete everything else. Returns a summary of what was removed.
+     */
+    @PostMapping("/cleanup-duplicates")
+    public Map<String, Object> cleanupDuplicates(
+            @RequestHeader(value = "X-User-Role", defaultValue = "") String role) {
+        if (!"Admin".equals(role)) {
+            return Map.of("error", "Forbidden — admin only");
+        }
+        // Build the protected URL set: every image URL currently in use by
+        // any inventory item across all stores. Cleanup is global because
+        // Cloudinary assets aren't partitioned by store.
+        Set<String> inUseUrls = new HashSet<>();
+        for (InventoryItem item : repo.findAll()) {
+            String url = item.getImage();
+            if (url != null && !url.isBlank()) inUseUrls.add(url);
+        }
+        return cloudinaryService.cleanupInventoryDuplicates(inUseUrls);
+    }
+
+    /** Slugify a file name into a Cloudinary-safe public_id (no extension). */
+    private static String slugifyFileName(String name) {
+        if (name == null || name.isBlank()) return "image";
+        String stripped = name.replaceAll("\\.[^.]+$", "")
+                              .toLowerCase()
+                              .replaceAll("[^a-z0-9]+", "-")
+                              .replaceAll("^-+|-+$", "");
+        return stripped.isEmpty() ? "image" : stripped;
     }
 
     @PostMapping
