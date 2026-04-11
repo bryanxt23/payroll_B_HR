@@ -72,9 +72,87 @@ function sectionTitle(doc, text, y) {
   return y + 5;
 }
 
-async function exportSalesPDF(salesStats, topItems, topBuyers, inventoryItems, dateFrom, dateTo) {
+// Draws a one-line "Filters:" summary under the PDF header listing the
+// non-default sidebar filters (action types, teams, payment terms,
+// category, search). Date range already appears in the header itself.
+// Returns the new y cursor.
+function renderFilterSummary(doc, f, y) {
+  if (!f) return y;
+  const parts = [];
+  if (f.search && f.search.trim())       parts.push(`Search: "${f.search.trim()}"`);
+  if (f.actionFilter?.length)            parts.push(`Action: ${f.actionFilter.join(", ")}`);
+  if (f.teamFilter?.length)              parts.push(`Team: ${f.teamFilter.join(", ")}`);
+  if (f.termsFilter?.length)             parts.push(`Terms: ${f.termsFilter.join(", ")}`);
+  if (f.categoryFilter?.length)          parts.push(`Category: ${f.categoryFilter.join(", ")}`);
+  if (parts.length === 0) return y;
+
+  doc.setFontSize(9);
+  doc.setFont(undefined, "normal");
+  doc.setTextColor(...GRAY);
+  const text = pdfSafe("Filters: " + parts.join("  -  "));
+  const wrapped = doc.splitTextToSize(text, doc.internal.pageSize.getWidth() - 28);
+  doc.text(wrapped, 14, y);
+  doc.setTextColor(0, 0, 0);
+  return y + wrapped.length * 4 + 4;
+}
+
+// jsPDF's default Helvetica is Latin-1 only. Any non-Latin-1 character
+// (₱, em-dash, smart quotes, emoji) renders as a per-glyph escape that
+// looks like "&P&a&y…" AND inflates the visual text length so it spills
+// outside the cell. Replace the known offenders with plain ASCII and
+// drop anything else > 0xFF.
+function pdfSafe(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/₱/g, "P")
+    .replace(/[—–]/g, "-")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x00-\xFF]/g, "");
+}
+
+// Renders the filtered activity-log rows as a new page in the PDF.
+// Mirrors the on-screen table columns (User, Action, Buyer/Item,
+// Details, Date, Time) so exported output matches what the user sees.
+function renderActivityLogSection(doc, logs, title) {
+  doc.addPage();
+  let y = pdfHeader(doc, title, null, null);
+  y = sectionTitle(doc, `${title} (${logs.length} ${logs.length === 1 ? "entry" : "entries"})`, y);
+
+  const rows = logs.map(l => [
+    pdfSafe(l.username || "—"),
+    pdfSafe(l.actionType || "—"),
+    pdfSafe(l.targetName || l.entityName || "—"),
+    pdfSafe(l.details || l.action || "—"),
+    l.createdAt ? fmtDate(l.createdAt) : "—",
+    l.createdAt ? fmtTime(l.createdAt) : "—",
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [["User", "Action", "Buyer / Item", "Details", "Date", "Time"]],
+    body: rows.length ? rows : [["", "", "No matching activity", "", "", ""]],
+    headStyles: { fillColor: GOLD, textColor: 255, fontStyle: "bold", fontSize: 8 },
+    bodyStyles: { fontSize: 7, valign: "top" },
+    styles: { overflow: "linebreak", cellPadding: 1.5 },
+    columnStyles: {
+      0: { cellWidth: 18 },
+      1: { cellWidth: 16 },
+      2: { cellWidth: 40 },
+      3: { cellWidth: "auto" },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 16 },
+    },
+    margin: { left: 14, right: 14 },
+    tableWidth: "auto",
+  });
+}
+
+async function exportSalesPDF(salesStats, topItems, topBuyers, inventoryItems, dateFrom, dateTo, filteredLogs, activeFilters) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let y = pdfHeader(doc, "Sales Report", dateFrom, dateTo);
+  y = renderFilterSummary(doc, activeFilters, y);
 
   // ── Summary stats (matches the on-screen cards + Total Profit) ─────
   y = sectionTitle(doc, "Summary", y);
@@ -146,6 +224,12 @@ async function exportSalesPDF(salesStats, topItems, topBuyers, inventoryItems, d
     margin: { left: 14, right: 14 },
   });
 
+  // ── Filtered Activity Log ─────────────────────────────────────────
+  // Everything the user sees in the on-screen table, with whichever
+  // sidebar filters (action type, team, payment terms, date range,
+  // search) they've applied. New page so it gets the full width.
+  renderActivityLogSection(doc, filteredLogs || [], "Sales Activity Log");
+
   doc.save("sales_report.pdf");
 }
 
@@ -162,9 +246,10 @@ function loadImage(url) {
   });
 }
 
-async function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo) {
+async function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo, filteredLogs, activeFilters) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let y = pdfHeader(doc, "Inventory Report", dateFrom, dateTo);
+  y = renderFilterSummary(doc, activeFilters, y);
 
   // ── Summary stats (matches the on-screen cards + Total Profit) ─────
   const inStock  = filteredItems.filter(i => i.status === "In Stock").length;
@@ -288,6 +373,9 @@ async function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo) {
       try { doc.addImage(img, "JPEG", x, cy, size, size); } catch {}
     },
   });
+
+  // ── Filtered Activity Log ─────────────────────────────────────────
+  renderActivityLogSection(doc, filteredLogs || [], "Inventory Activity Log");
 
   doc.save("inventory_report.pdf");
 }
@@ -506,6 +594,83 @@ export default function ReportsPage() {
       .map(([name, data]) => ({ name, count: data.count, total: data.total }));
   }, [filteredSales]);
 
+  // ── Sales used for the PDF export ────────────────────────────────
+  // filteredSales is date-bounded only. The export should also honor
+  // the sidebar's team, payment-terms, and action-type filters so the
+  // summary / top items / top buyers sections only reflect the subset
+  // the user is looking at. team and paymentTerms live directly on the
+  // sale; action type is a log concept, so we narrow by sales whose
+  // "customer / item" target appears in a filtered activity log.
+  const exportSales = useMemo(() => {
+    let rows = filteredSales;
+    if (teamFilter.length > 0) {
+      rows = rows.filter(s => s.team && teamFilter.includes(s.team));
+    }
+    if (termsFilter.length > 0) {
+      rows = rows.filter(s => s.paymentTerms && termsFilter.includes(s.paymentTerms));
+    }
+    if (actionFilter.length > 0) {
+      const allowedTargets = new Set();
+      salesLogs.forEach(l => {
+        if (!actionFilter.includes(l.actionType)) return;
+        if (dateFrom || dateTo) {
+          const logDate = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : null;
+          if (dateFrom && logDate && logDate < dateFrom) return;
+          if (dateTo   && logDate && logDate > dateTo)   return;
+        }
+        const key = (l.targetName || "").trim().toLowerCase();
+        if (key) allowedTargets.add(key);
+      });
+      rows = rows.filter(s => {
+        const key = `${(s.customerName || "").trim()} / ${(s.item || "").trim()}`.toLowerCase();
+        return allowedTargets.has(key);
+      });
+    }
+    return rows;
+  }, [filteredSales, teamFilter, termsFilter, actionFilter, salesLogs, dateFrom, dateTo]);
+
+  const exportSalesStats = useMemo(() => {
+    let total = 0, paid = 0, remaining = 0, profit = 0;
+    exportSales.forEach(s => {
+      const t = Number(s.totalPrice) || 0;
+      const r = Number(s.remainingBalance) || 0;
+      total     += t;
+      remaining += r;
+      paid      += Math.max(0, t - r);
+      profit    += expectedProfit(s);
+    });
+    return { total, count: exportSales.length, paid, remaining, profit };
+  }, [exportSales, inventoryByName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const exportTopSalesItems = useMemo(() => {
+    const map = {};
+    exportSales.forEach(s => {
+      const name = (s.item || "Unknown").trim() || "Unknown";
+      if (!map[name]) map[name] = { count: 0, total: 0, profit: 0 };
+      map[name].count  += 1;
+      map[name].total  += Number(s.totalPrice) || 0;
+      map[name].profit += expectedProfit(s);
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5)
+      .map(([name, data]) => ({ name, count: data.count, total: data.total, profit: data.profit }));
+  }, [exportSales, inventoryByName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const exportTopSalesBuyers = useMemo(() => {
+    const map = {};
+    exportSales.forEach(s => {
+      const name = (s.customerName || "Unknown").trim() || "Unknown";
+      if (!map[name]) map[name] = { count: 0, total: 0 };
+      map[name].count += 1;
+      map[name].total += Number(s.totalPrice) || 0;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5)
+      .map(([name, data]) => ({ name, count: data.count, total: data.total }));
+  }, [exportSales]);
+
   // ── Inventory summary stats ────────────────────────────────────────
   const invStats = useMemo(() => {
     const total    = filteredInventoryItems.length;
@@ -659,10 +824,19 @@ export default function ReportsPage() {
               <button
                 className={styles.exportBtn}
                 onClick={() => {
+                  const activeFilters = {
+                    search, actionFilter, teamFilter, termsFilter, categoryFilter,
+                  };
                   if (activeTab === "Sales") {
-                    exportSalesPDF(salesStats, topSalesItems, topSalesBuyers, inventoryItems, dateFrom, dateTo);
+                    exportSalesPDF(
+                      exportSalesStats, exportTopSalesItems, exportTopSalesBuyers, inventoryItems,
+                      dateFrom, dateTo, filtered, activeFilters,
+                    );
                   } else {
-                    exportInventoryPDF(exportInventoryItems, isAdmin(), dateFrom, dateTo);
+                    exportInventoryPDF(
+                      exportInventoryItems, isAdmin(),
+                      dateFrom, dateTo, filtered, activeFilters,
+                    );
                   }
                 }}
               >
