@@ -4,6 +4,7 @@ import API from "../../config";
 import { isAdmin } from "../../utils/permissions";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getStores } from "../../utils/stores";
 const PAGE_SIZE = 15;
 
 const ACTION_COLORS = {
@@ -49,19 +50,45 @@ const GOLD  = [193, 148, 28];
 const LGOLD = [255, 248, 220];
 const GRAY  = [100, 100, 100];
 
+// Resolve the currently-selected store's display name from the same
+// source the Topbar uses (utils/stores.js + localStorage). Falls back
+// gracefully if nothing is set, so reports still generate for guests.
+function currentStoreName() {
+  try {
+    const raw = sessionStorage.getItem("user") || localStorage.getItem("user");
+    const u = raw ? JSON.parse(raw) : null;
+    const id = localStorage.getItem(`currentStore_${u?.id ?? "guest"}`);
+    const stores = getStores();
+    const match = stores.find(s => String(s.id) === String(id)) || stores[0];
+    return match?.name || "";
+  } catch {
+    return "";
+  }
+}
+
 function pdfHeader(doc, title, dateFrom, dateTo) {
+  const pageW = doc.internal.pageSize.getWidth();
   doc.setFillColor(...GOLD);
-  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, "F");
+  doc.rect(0, 0, pageW, 28, "F");
+
+  // Store name across the top in small caps, title below it.
+  const store = currentStoreName();
   doc.setTextColor(255, 255, 255);
+  if (store) {
+    doc.setFontSize(9); doc.setFont(undefined, "bold");
+    doc.text(pdfSafe(store).toUpperCase(), 14, 9);
+  }
   doc.setFontSize(16); doc.setFont(undefined, "bold");
-  doc.text(title, 14, 14);
+  doc.text(pdfSafe(title), 14, 19);
+
   const dateRange = dateFrom || dateTo
-    ? `${dateFrom || "—"}  to  ${dateTo || "—"}`
+    ? `${dateFrom || "-"}  to  ${dateTo || "-"}`
     : "All time";
   doc.setFontSize(9); doc.setFont(undefined, "normal");
-  doc.text(dateRange, doc.internal.pageSize.getWidth() - 14, 14, { align: "right" });
+  doc.text(dateRange, pageW - 14, 19, { align: "right" });
+
   doc.setTextColor(0, 0, 0);
-  return 28; // y cursor after header
+  return 34; // y cursor after header (header grew from 22 → 28 tall)
 }
 
 function sectionTitle(doc, text, y) {
@@ -115,9 +142,13 @@ function pdfSafe(s) {
 // Renders the filtered activity-log rows as a new page in the PDF.
 // Mirrors the on-screen table columns (User, Action, Buyer/Item,
 // Details, Date, Time) so exported output matches what the user sees.
-function renderActivityLogSection(doc, logs, title) {
+// Also repeats the active-filter summary at the top of this page so a
+// recipient looking at "0 entries" immediately sees *why* — otherwise
+// the empty table looks like a bug.
+function renderActivityLogSection(doc, logs, title, dateFrom, dateTo, activeFilters) {
   doc.addPage();
-  let y = pdfHeader(doc, title, null, null);
+  let y = pdfHeader(doc, title, dateFrom, dateTo);
+  y = renderFilterSummary(doc, activeFilters, y);
   y = sectionTitle(doc, `${title} (${logs.length} ${logs.length === 1 ? "entry" : "entries"})`, y);
 
   const rows = logs.map(l => [
@@ -228,7 +259,7 @@ async function exportSalesPDF(salesStats, topItems, topBuyers, inventoryItems, d
   // Everything the user sees in the on-screen table, with whichever
   // sidebar filters (action type, team, payment terms, date range,
   // search) they've applied. New page so it gets the full width.
-  renderActivityLogSection(doc, filteredLogs || [], "Sales Activity Log");
+  renderActivityLogSection(doc, filteredLogs || [], "Sales Activity Log", dateFrom, dateTo, activeFilters);
 
   doc.save("sales_report.pdf");
 }
@@ -375,7 +406,7 @@ async function exportInventoryPDF(filteredItems, adminView, dateFrom, dateTo, fi
   });
 
   // ── Filtered Activity Log ─────────────────────────────────────────
-  renderActivityLogSection(doc, filteredLogs || [], "Inventory Activity Log");
+  renderActivityLogSection(doc, filteredLogs || [], "Inventory Activity Log", dateFrom, dateTo, activeFilters);
 
   doc.save("inventory_report.pdf");
 }
@@ -551,57 +582,14 @@ export default function ReportsPage() {
     return Number(sale.profit) || 0;
   };
 
-  // ── Sales summary stats (derived directly from the sales records) ──
-  const salesStats = useMemo(() => {
-    let total = 0, paid = 0, remaining = 0, profit = 0;
-    filteredSales.forEach(s => {
-      const t = Number(s.totalPrice) || 0;
-      const r = Number(s.remainingBalance) || 0;
-      total     += t;
-      remaining += r;
-      paid      += Math.max(0, t - r);
-      profit    += expectedProfit(s);
-    });
-    return { total, count: filteredSales.length, paid, remaining, profit };
-  }, [filteredSales, inventoryByName]);
-
-  const topSalesItems = useMemo(() => {
-    const map = {};
-    filteredSales.forEach(s => {
-      const name = (s.item || "Unknown").trim() || "Unknown";
-      if (!map[name]) map[name] = { count: 0, total: 0, profit: 0 };
-      map[name].count  += 1;
-      map[name].total  += Number(s.totalPrice) || 0;
-      map[name].profit += expectedProfit(s);
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1].total - a[1].total)
-      .slice(0, 5)
-      .map(([name, data]) => ({ name, count: data.count, total: data.total, profit: data.profit }));
-  }, [filteredSales, inventoryByName]);
-
-  const topSalesBuyers = useMemo(() => {
-    const map = {};
-    filteredSales.forEach(s => {
-      const name = (s.customerName || "Unknown").trim() || "Unknown";
-      if (!map[name]) map[name] = { count: 0, total: 0 };
-      map[name].count += 1;
-      map[name].total += Number(s.totalPrice) || 0;
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1].total - a[1].total)
-      .slice(0, 5)
-      .map(([name, data]) => ({ name, count: data.count, total: data.total }));
-  }, [filteredSales]);
-
-  // ── Sales used for the PDF export ────────────────────────────────
-  // filteredSales is date-bounded only. The export should also honor
-  // the sidebar's team, payment-terms, and action-type filters so the
-  // summary / top items / top buyers sections only reflect the subset
-  // the user is looking at. team and paymentTerms live directly on the
-  // sale; action type is a log concept, so we narrow by sales whose
-  // "customer / item" target appears in a filtered activity log.
-  const exportSales = useMemo(() => {
+  // ── Sales narrowed for the summary / top items / top buyers ─────
+  // Honors date range + team + payment terms. Deliberately does NOT
+  // apply the action-type filter — action types (Added/Edited/Paid
+  // /Deleted) are a property of activity log entries, not of sales
+  // records, so they only narrow the activity table below, not the
+  // totals above. Same memo powers the on-screen cards and the PDF
+  // export so the two always agree.
+  const filteredSalesForStats = useMemo(() => {
     let rows = filteredSales;
     if (teamFilter.length > 0) {
       rows = rows.filter(s => s.team && teamFilter.includes(s.team));
@@ -609,29 +597,13 @@ export default function ReportsPage() {
     if (termsFilter.length > 0) {
       rows = rows.filter(s => s.paymentTerms && termsFilter.includes(s.paymentTerms));
     }
-    if (actionFilter.length > 0) {
-      const allowedTargets = new Set();
-      salesLogs.forEach(l => {
-        if (!actionFilter.includes(l.actionType)) return;
-        if (dateFrom || dateTo) {
-          const logDate = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : null;
-          if (dateFrom && logDate && logDate < dateFrom) return;
-          if (dateTo   && logDate && logDate > dateTo)   return;
-        }
-        const key = (l.targetName || "").trim().toLowerCase();
-        if (key) allowedTargets.add(key);
-      });
-      rows = rows.filter(s => {
-        const key = `${(s.customerName || "").trim()} / ${(s.item || "").trim()}`.toLowerCase();
-        return allowedTargets.has(key);
-      });
-    }
     return rows;
-  }, [filteredSales, teamFilter, termsFilter, actionFilter, salesLogs, dateFrom, dateTo]);
+  }, [filteredSales, teamFilter, termsFilter]);
 
-  const exportSalesStats = useMemo(() => {
+  // ── Sales summary stats (derived directly from the sales records) ──
+  const salesStats = useMemo(() => {
     let total = 0, paid = 0, remaining = 0, profit = 0;
-    exportSales.forEach(s => {
+    filteredSalesForStats.forEach(s => {
       const t = Number(s.totalPrice) || 0;
       const r = Number(s.remainingBalance) || 0;
       total     += t;
@@ -639,12 +611,12 @@ export default function ReportsPage() {
       paid      += Math.max(0, t - r);
       profit    += expectedProfit(s);
     });
-    return { total, count: exportSales.length, paid, remaining, profit };
-  }, [exportSales, inventoryByName]); // eslint-disable-line react-hooks/exhaustive-deps
+    return { total, count: filteredSalesForStats.length, paid, remaining, profit };
+  }, [filteredSalesForStats, inventoryByName]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const exportTopSalesItems = useMemo(() => {
+  const topSalesItems = useMemo(() => {
     const map = {};
-    exportSales.forEach(s => {
+    filteredSalesForStats.forEach(s => {
       const name = (s.item || "Unknown").trim() || "Unknown";
       if (!map[name]) map[name] = { count: 0, total: 0, profit: 0 };
       map[name].count  += 1;
@@ -655,11 +627,11 @@ export default function ReportsPage() {
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
       .map(([name, data]) => ({ name, count: data.count, total: data.total, profit: data.profit }));
-  }, [exportSales, inventoryByName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredSalesForStats, inventoryByName]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const exportTopSalesBuyers = useMemo(() => {
+  const topSalesBuyers = useMemo(() => {
     const map = {};
-    exportSales.forEach(s => {
+    filteredSalesForStats.forEach(s => {
       const name = (s.customerName || "Unknown").trim() || "Unknown";
       if (!map[name]) map[name] = { count: 0, total: 0 };
       map[name].count += 1;
@@ -669,7 +641,7 @@ export default function ReportsPage() {
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
       .map(([name, data]) => ({ name, count: data.count, total: data.total }));
-  }, [exportSales]);
+  }, [filteredSalesForStats]);
 
   // ── Inventory summary stats ────────────────────────────────────────
   const invStats = useMemo(() => {
@@ -829,7 +801,7 @@ export default function ReportsPage() {
                   };
                   if (activeTab === "Sales") {
                     exportSalesPDF(
-                      exportSalesStats, exportTopSalesItems, exportTopSalesBuyers, inventoryItems,
+                      salesStats, topSalesItems, topSalesBuyers, inventoryItems,
                       dateFrom, dateTo, filtered, activeFilters,
                     );
                   } else {

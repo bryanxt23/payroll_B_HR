@@ -518,7 +518,31 @@
 
 .dateInput:focus { border-color: #c9a84c; }
 
-.optionList { display: flex; flex-direction: column; gap: 4px; }
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  /* Thin, fading scrollbar. The track stays invisible; the thumb is
+     semi-transparent and only materializes when the user hovers the
+     list or actively scrolls it. Firefox uses the native
+     scrollbar-width / scrollbar-color shorthand. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+.optionList::-webkit-scrollbar        { width: 6px; }
+.optionList::-webkit-scrollbar-track  { background: transparent; }
+.optionList::-webkit-scrollbar-thumb  {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+.optionList:hover,
+.optionList:focus-within { scrollbar-color: rgba(0, 0, 0, 0.25) transparent; }
+.optionList:hover::-webkit-scrollbar-thumb,
+.optionList:focus-within::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.25); }
+.optionList:hover::-webkit-scrollbar-thumb:hover  { background: rgba(0, 0, 0, 0.4); }
 
 .optionRow {
   display: flex;
