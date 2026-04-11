@@ -372,9 +372,26 @@
   max-height: 280px;
   overflow-y: auto;
   padding-right: 6px;
+
+  /* Thin, fading scrollbar — matches the Reports page filter lists.
+     Track stays invisible; thumb is semi-transparent and only
+     materializes when the user hovers the list or actively scrolls. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
 }
-.catList::-webkit-scrollbar { width: 6px; }
-.catList::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 999px; }
+.catList::-webkit-scrollbar        { width: 6px; }
+.catList::-webkit-scrollbar-track  { background: transparent; }
+.catList::-webkit-scrollbar-thumb  {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+.catList:hover,
+.catList:focus-within { scrollbar-color: rgba(0, 0, 0, 0.25) transparent; }
+.catList:hover::-webkit-scrollbar-thumb,
+.catList:focus-within::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.25); }
+.catList:hover::-webkit-scrollbar-thumb:hover  { background: rgba(0, 0, 0, 0.4); }
 
 .strip {
   border-radius: 14px;
