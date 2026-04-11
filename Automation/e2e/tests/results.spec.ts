@@ -67,6 +67,16 @@ type Sale = {
   remainingBalance?: number;
   monthlyPayment?: number;
 };
+
+/** Locator that finds a sub-stat value by its visible label (for the
+ *  smaller "Total Monthly Payments / In Sales This Month / …" row that
+ *  sits below the four big cards on /sales).  The value sits as a
+ *  previous sibling <div> of the label <div> inside the same parent. */
+function subStatValueByLabel(scope: Page, label: string) {
+  return scope
+    .locator("xpath=.//div[normalize-space(text())=" + JSON.stringify(label) + "]/preceding-sibling::div[1]")
+    .first();
+}
 type InventoryItem = { status?: string };
 type PaymentStats = { thisDay?: number; thisMonth?: number; thisYear?: number };
 
@@ -88,6 +98,7 @@ test.describe.serial("Result accuracy", () => {
   let expOutstanding: number;
   let expActiveLoans: number;
   let expTotalBuyers: number;
+  let expMonthlyPaymentsSum: number;
   let expTotalProducts: number;
   let expItemsAvailable: number;
   let expActiveBuyers: number;
@@ -104,10 +115,11 @@ test.describe.serial("Result accuracy", () => {
 
     // Mirror SalesPage.jsx stats (lines ~278–287):
     const activeLoans = sales.filter(s => (s.status || "Active") === "Active");
-    expActiveLoans  = activeLoans.length;
-    expTotalBuyers  = sales.length;
-    expSalesTotal   = sales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
-    expOutstanding  = sales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+    expActiveLoans        = activeLoans.length;
+    expTotalBuyers        = sales.length;
+    expSalesTotal         = sales.reduce((s, l) => s + ((l.totalPrice || 0) - (l.remainingBalance || 0)), 0);
+    expOutstanding        = sales.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+    expMonthlyPaymentsSum = activeLoans.reduce((s, l) => s + (l.monthlyPayment || 0), 0);
 
     // Mirror DashboardPage.jsx stats (lines ~143–167):
     expTotalProducts  = inventory.length;
@@ -132,6 +144,38 @@ test.describe.serial("Result accuracy", () => {
 
     test("Outstanding Balance matches sum of remainingBalance", async ({ page }) => {
       await expect(statValueByLabel(page, "Outstanding Balance")).toHaveText(`₱${fmt(expOutstanding)}`);
+    });
+
+    test("Monthly Payments Ongoing shows activeLoans / totalBuyers", async ({ page }) => {
+      // Rendered as "{activeLoans} / {totalBuyers}" inside one statValue
+      // span (e.g. "2 / 2"). We normalize whitespace because the JSX has
+      // the number and the "/ N" fragment in separate text nodes.
+      const value = statValueByLabel(page, "Monthly Payments Ongoing");
+      const raw = (await value.textContent()) || "";
+      const normalized = raw.replace(/\s+/g, " ").trim();
+      expect(normalized).toBe(`${expActiveLoans} / ${expTotalBuyers}`);
+    });
+
+    test("Total Monthly Payments matches sum of active monthlyPayment", async ({ page }) => {
+      await expect(subStatValueByLabel(page, "Total Monthly Payments"))
+        .toHaveText(`₱${fmt(expMonthlyPaymentsSum)}`);
+    });
+
+    test("In Sales This Month matches sum of (totalPrice - remainingBalance)", async ({ page }) => {
+      // Same math as "Sales Total" above — the UI literally reads from
+      // stats.salesTotal for both cards, so they must agree.
+      await expect(subStatValueByLabel(page, "In Sales This Month"))
+        .toHaveText(`₱${fmt(expSalesTotal)}`);
+    });
+
+    test("Outstanding This Month matches sum of remainingBalance", async ({ page }) => {
+      await expect(subStatValueByLabel(page, "Outstanding This Month"))
+        .toHaveText(`₱${fmt(expOutstanding)}`);
+    });
+
+    test("Total Buyers matches sales.length", async ({ page }) => {
+      await expect(subStatValueByLabel(page, "Total Buyers"))
+        .toHaveText(String(expTotalBuyers));
     });
 
     test("Filter sidebar This Day Sale matches /api/payments/stats.thisDay", async ({ page }) => {
